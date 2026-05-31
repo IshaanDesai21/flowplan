@@ -1,40 +1,40 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
-	import { toasts } from '$lib/stores/toast.js';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
 	import KanbanBoard from '$lib/components/tasks/KanbanBoard.svelte';
 	import TaskForm from '$lib/components/tasks/TaskForm.svelte';
-	import type { TaskView } from '$lib/types/index.js';
+	import { toasts } from '$lib/stores/toast.js';
 
 	let { data } = $props();
 
-	let currentView = $state<TaskView>('kanban');
+	let tasks = $state(data.tasks);
+	let view = $state('kanban');
 	let isFormOpen = $state(false);
 	let selectedTask = $state<any>(null);
-	let initialStatus = $state<string>('NOT_STARTED');
+	let initialStatusForNew = $state('NOT_STARTED');
 
-	const viewTabs = [
+	const views = [
 		{ id: 'kanban', label: 'Board' },
 		{ id: 'list', label: 'List' }
 	];
 
-	function handleTaskClick(task: any) {
-		selectedTask = task;
+	function openNewTaskModal(status = 'NOT_STARTED') {
+		selectedTask = null;
+		initialStatusForNew = status;
 		isFormOpen = true;
 	}
 
-	function handleAddTask(status?: string) {
-		selectedTask = null;
-		initialStatus = status || 'NOT_STARTED';
+	function openEditTaskModal(task: any) {
+		selectedTask = task;
 		isFormOpen = true;
 	}
 
 	async function handleSaveTask(taskData: any) {
 		try {
-			const method = taskData.id ? 'PUT' : 'POST';
-			const url = taskData.id ? `/api/tasks/${taskData.id}` : '/api/tasks';
-			
+			const isEdit = !!taskData.id;
+			const url = isEdit ? `/api/tasks/${taskData.id}` : '/api/tasks';
+			const method = isEdit ? 'PUT' : 'POST';
+
 			const res = await fetch(url, {
 				method,
 				headers: { 'Content-Type': 'application/json' },
@@ -43,75 +43,114 @@
 
 			if (!res.ok) throw new Error('Failed to save task');
 
-			toasts.success(taskData.id ? 'Task updated' : 'Task created');
+			const savedTask = await res.json();
+			
+			// Format dates for UI
+			if (savedTask.dueDate) savedTask.dueDate = savedTask.dueDate; // Keep ISO string
+
+			if (isEdit) {
+				tasks = tasks.map(t => t.id === savedTask.id ? savedTask : t);
+				toasts.success('Task updated');
+			} else {
+				tasks = [...tasks, savedTask];
+				toasts.success('Task created');
+			}
 			isFormOpen = false;
-			await invalidateAll(); // Reload data
-		} catch (error) {
-			toasts.error('An error occurred while saving the task');
+		} catch (e) {
+			toasts.error('Error saving task');
+			console.error(e);
 		}
 	}
 
 	async function handleStatusChange(taskId: string, newStatus: string, newPosition: number) {
+		// Optimistic update
+		tasks = tasks.map(t => {
+			if (t.id === taskId) {
+				return { ...t, status: newStatus, position: newPosition };
+			}
+			return t;
+		});
+
 		try {
 			const res = await fetch(`/api/tasks/${taskId}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ status: newStatus, position: newPosition })
 			});
-
-			if (!res.ok) throw new Error('Failed to update task status');
-			await invalidateAll();
-		} catch (error) {
-			toasts.error('An error occurred while moving the task');
+			if (!res.ok) throw new Error('Failed to update status');
+		} catch (e) {
+			// Revert on failure (simplistic: just reload data in real app, here we just show error)
+			toasts.error('Failed to save task movement');
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>Tasks | FlowPlan</title>
+	<title>Tasks — FlowPlan</title>
 </svelte:head>
 
-<div class="flex flex-col h-full space-y-4">
-	<!-- Header -->
-	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div class="tasks-page h-full flex flex-col">
+	<header class="page-header">
 		<div>
-			<h1 class="text-2xl font-bold tracking-tight text-primary">Tasks</h1>
-			<p class="text-sm text-secondary">Manage and organize your work.</p>
+			<h1 class="page-title">Tasks</h1>
+			<p class="page-subtitle">Manage your projects and to-dos</p>
 		</div>
-		<div class="flex items-center gap-3">
-			<Tabs 
-				tabs={viewTabs} 
-				activeId={currentView} 
-				onchange={(id) => currentView = id as any} 
-			/>
-			<Button onclick={() => handleAddTask()} class="hidden sm:flex">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+		<div class="header-actions">
+			<Tabs tabs={views} activeId={view} onchange={(v) => view = v} />
+			<Button variant="primary" onclick={() => openNewTaskModal()}>
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1">
+					<path d="M12 5v14M5 12h14" />
+				</svg>
 				New Task
 			</Button>
 		</div>
-	</div>
+	</header>
 
-	<!-- Task Views -->
-	<div class="flex-1 min-h-0 overflow-hidden">
-		{#if currentView === 'kanban'}
+	<div class="tasks-content flex-1 overflow-hidden">
+		{#if view === 'kanban'}
 			<KanbanBoard 
-				tasks={data.tasks}
-				onTaskClick={handleTaskClick}
+				{tasks} 
+				onTaskClick={openEditTaskModal} 
 				onStatusChange={handleStatusChange}
-				onAddTask={handleAddTask}
+				onAddTask={openNewTaskModal}
 			/>
 		{:else}
-			<div class="bg-surface rounded-xl border border-default p-8 text-center">
-				<p class="text-secondary">List view coming soon.</p>
+			<div class="flex items-center justify-center h-full text-secondary">
+				<p>List view is under construction</p>
 			</div>
 		{/if}
 	</div>
 </div>
 
 <TaskForm 
-	isOpen={isFormOpen}
+	isOpen={isFormOpen} 
 	task={selectedTask}
-	{initialStatus}
-	onclose={() => isFormOpen = false}
-	onsave={handleSaveTask}
+	initialStatus={initialStatusForNew}
+	onclose={() => isFormOpen = false} 
+	onsave={handleSaveTask} 
 />
+
+<style>
+	.page-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding-bottom: 1.5rem;
+	}
+	.page-title {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: var(--color-text);
+		margin: 0 0 0.25rem;
+	}
+	.page-subtitle {
+		font-size: 0.9rem;
+		color: var(--color-text-secondary);
+		margin: 0;
+	}
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+</style>

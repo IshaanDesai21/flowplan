@@ -1,18 +1,25 @@
+import { redirect } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db.js';
-import type { PageServerLoad } from './$types.js';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const userId = locals.user!.id;
+	if (!locals.user) {
+		throw redirect(302, '/login');
+	}
 
 	const tasks = await db.task.findMany({
-		where: { userId },
-		orderBy: [
-			{ position: 'asc' },
-			{ dueDate: 'asc' }
-		]
+		where: { userId: locals.user.id },
+		orderBy: [{ position: 'asc' }, { createdAt: 'desc' }]
 	});
 
-	return {
-		tasks
-	};
+	// Serialize dates for SvelteKit transfer
+	const serializedTasks = tasks.map(t => ({
+		...t,
+		dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+		createdAt: t.createdAt.toISOString(),
+		updatedAt: t.updatedAt.toISOString(),
+		completedAt: t.completedAt ? t.completedAt.toISOString() : null
+	}));
+
+	return { tasks: serializedTasks };
 };
