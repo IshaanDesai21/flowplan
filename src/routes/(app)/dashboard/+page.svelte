@@ -14,19 +14,24 @@
 		return 'Good evening';
 	});
 
-	// Typewriter for AI summary
 	let displayedSummary = $state('');
 	let summaryFull = $state('');
 
-	function startTypewriter(text: string) {
+	$effect(() => {
+		if (summaryFull && summaryFull !== '') {
+			displayedSummary = '';
+			let i = 0;
+			const interval = setInterval(() => {
+				i++;
+				displayedSummary = summaryFull.slice(0, i);
+				if (i >= summaryFull.length) clearInterval(interval);
+			}, 22);
+			return () => clearInterval(interval);
+		}
+	});
+
+	function initTypewriter(node: HTMLElement, text: string) {
 		summaryFull = text;
-		displayedSummary = '';
-		let i = 0;
-		const interval = setInterval(() => {
-			i++;
-			displayedSummary = text.slice(0, i);
-			if (i >= text.length) clearInterval(interval);
-		}, 22);
 	}
 
 	// Circle checkbox with undo-delay (matches tasks page behavior)
@@ -75,8 +80,7 @@
 								<div class="skeleton-line" style="width: 80%"></div>
 							</div>
 						{:then aiSummary}
-							{@const _ = (() => { startTypewriter(aiSummary); return ''; })()}
-							<p class="typewriter-text">{displayedSummary}<span class="cursor" class:hidden={displayedSummary === summaryFull}></span></p>
+							<p class="typewriter-text" use:initTypewriter={aiSummary}>{displayedSummary}<span class="cursor" class:hidden={displayedSummary === aiSummary}></span></p>
 						{:catch}
 							<p>Ready to tackle your tasks today?</p>
 						{/await}
@@ -236,7 +240,8 @@
 										<p class="task-title" class:strike={completingIds.has(task.id)}>{task.title}</p>
 										<div class="task-meta">
 											{#if task.priority && task.priority !== 'MEDIUM'}
-												<span class="task-priority" style="color: {PRIORITY_COLORS[task.priority]}">
+												{@const p = task.priority as keyof typeof PRIORITY_COLORS}
+												<span class="task-priority" style="color: {PRIORITY_COLORS[p]}">
 													{task.priority.toLowerCase()}
 												</span>
 											{/if}
@@ -280,7 +285,9 @@
 									<div class="task-content">
 										<p class="task-title" class:strike={completingIds.has(task.id)}>{task.title}</p>
 										<div class="task-meta">
-											<span class="task-date">{formatDate(task.dueDate)}</span>
+											{#if task.dueDate}
+												<span class="task-date">{formatDate(task.dueDate)}</span>
+											{/if}
 										</div>
 									</div>
 									{#if completingIds.has(task.id)}
@@ -380,10 +387,7 @@
 	.cursor.hidden { display: none; }
 	@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 	
-	.header-actions {
-		display: flex;
-		gap: 0.75rem;
-	}
+
 
 	/* Stats Grid */
 	.stats-grid {
@@ -391,7 +395,8 @@
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 1rem;
 	}
-	.stat-card {
+
+	:global(.stat-card) {
 		display: flex;
 		align-items: center;
 		gap: 1.25rem;
@@ -409,21 +414,22 @@
 	.stat-content {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.5rem;
 	}
 	.stat-label {
-		font-size: 0.8rem;
+		font-size: 0.85rem;
 		color: var(--color-text-secondary);
 		margin: 0;
 		white-space: nowrap;
+		letter-spacing: 0.02em;
 	}
 	.stat-value {
-		font-size: 2rem;
+		font-size: 2.25rem;
 		font-weight: 800;
 		color: var(--color-text);
 		margin: 0;
-		letter-spacing: -0.03em;
-		line-height: 1;
+		letter-spacing: -0.02em;
+		line-height: 1.1;
 	}
 
 	/* Main Grid */

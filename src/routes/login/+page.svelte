@@ -42,12 +42,12 @@
 </svelte:head>
 
 <div class="auth-page">
-	<a href="/" class="back-link">
-		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-		Back to home
-	</a>
-
 	<div class="auth-container animate-scale-in">
+		<a href="/" class="back-link">
+			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+			Back to home
+		</a>
+
 		<a href="/" class="auth-brand">
 			<svg width="36" height="36" viewBox="0 0 32 32" fill="none">
 				<rect width="32" height="32" rx="8" fill="var(--color-accent)" />
@@ -112,7 +112,6 @@
 		margin-bottom: 1.5rem;
 		transition: color 0.15s;
 		align-self: flex-start;
-		margin-left: calc(50% - 210px);
 	}
 	.back-link:hover { color: var(--color-text); }
 	.auth-container {
