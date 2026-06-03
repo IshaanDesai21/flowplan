@@ -365,11 +365,6 @@
 	}
 	.hero-btn-secondary:hover { border-color: var(--color-accent); transform: translateY(-1px); background: var(--color-surface-hover); }
 	.hero-btn-secondary:disabled { opacity: 0.7; cursor: wait; }
-	.hero-note {
-		font-size: 0.78rem;
-		color: var(--color-text-tertiary);
-		margin: 0.75rem 0 0;
-	}
 	.spinner {
 		width: 14px; height: 14px;
 		border: 2px solid var(--color-border);
@@ -380,7 +375,6 @@
 	@keyframes spin { to { transform: rotate(360deg); } }
 
 	/* App Preview */
-	.hero-right {}
 	.app-preview {
 		border-radius: var(--radius-xl);
 		border: 1px solid var(--color-border);
@@ -430,7 +424,6 @@
 		flex-direction: column;
 		gap: 0.875rem;
 	}
-	.preview-greeting {}
 	.pg-title { font-size: 0.9rem; font-weight: 700; color: var(--color-text); }
 	.pg-date { font-size: 0.72rem; color: var(--color-text-tertiary); margin-top: 1px; }
 	.preview-stats {
@@ -519,7 +512,6 @@
 		justify-content: center;
 		flex-shrink: 0;
 	}
-	.feature-text {}
 	.feature-card h3 {
 		font-size: 1rem;
 		font-weight: 700;

@@ -466,7 +466,7 @@
 	.view-all:hover {
 		text-decoration: underline;
 	}
-	.widget-card {
+	:global(.widget-card) {
 		flex: 1;
 		min-height: 200px;
 	}
