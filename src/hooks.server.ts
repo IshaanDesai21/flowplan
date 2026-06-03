@@ -2,10 +2,14 @@ import type { Handle } from '@sveltejs/kit';
 import { getSessionId, validateSession } from '$lib/server/auth.js';
 import { seedDemoUser } from '$lib/server/demo.js';
 
-// Seed demo user on startup
-seedDemoUser().catch(console.error);
+let hasSeededDemoUser = false;
 
 export const handle: Handle = async ({ event, resolve }) => {
+	if (!hasSeededDemoUser) {
+		hasSeededDemoUser = true;
+		seedDemoUser().catch(console.error);
+	}
+
 	const sessionId = getSessionId(event);
 
 	if (sessionId) {
