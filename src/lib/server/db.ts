@@ -10,7 +10,6 @@ function createPrismaClient() {
 			url: env.TURSO_DATABASE_URL,
 			authToken: env.TURSO_AUTH_TOKEN
 		});
-		// @ts-expect-error - PrismaLibSql types expect @libsql/client instead of @libsql/client/web, but they are runtime compatible
 		const adapter = new PrismaLibSql(libsql as any);
 		return new PrismaClient({ adapter, log: ['error'] } as any);
 	}
