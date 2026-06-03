@@ -10,7 +10,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		orderBy: { startTime: 'desc' }
 	});
 
-	return json(meetings);
+	return json(meetings.map(m => ({ ...m, participants: JSON.parse(m.participants || '[]'), actionItems: m.actionItems ? JSON.parse(m.actionItems) : null })));
 };
 
 export const POST: RequestHandler = async ({ locals, request }) => {
@@ -23,9 +23,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			title: data.title,
 			startTime: new Date(data.startTime),
 			endTime: new Date(data.endTime),
-			participants: data.participants || [],
+			participants: JSON.stringify(data.participants || []),
 			notes: data.notes || null,
-			actionItems: data.actionItems || null,
+			actionItems: data.actionItems ? JSON.stringify(data.actionItems) : null,
 			location: data.location || null
 		}
 	});

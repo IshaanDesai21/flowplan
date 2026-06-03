@@ -19,7 +19,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		orderBy: { startTime: 'asc' }
 	});
 
-	return json(events);
+	return json(events.map(e => ({ ...e, tags: JSON.parse(e.tags || '[]') })));
 };
 
 export const POST: RequestHandler = async ({ locals, request }) => {
@@ -35,7 +35,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			endTime: new Date(data.endTime),
 			location: data.location || null,
 			priority: data.priority || 'MEDIUM',
-			tags: data.tags || [],
+			tags: JSON.stringify(data.tags || []),
 			status: data.status || 'confirmed',
 			color: data.color || '#6366f1',
 			isRecurring: data.isRecurring || false,

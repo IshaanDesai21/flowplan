@@ -7,7 +7,7 @@ const DEFAULT_THEME: Theme = 'dark';
 function getInitialTheme(): Theme {
 	if (browser) {
 		const stored = localStorage.getItem('flowplan_theme') as Theme | null;
-		if (stored && ['light', 'dark', 'midnight', 'forest', 'slate', 'cream'].includes(stored)) {
+		if (stored && ['light', 'dark', 'midnight', 'slate', 'cream'].includes(stored)) {
 			return stored;
 		}
 	}

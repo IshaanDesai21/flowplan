@@ -80,10 +80,10 @@ function getMockResponse(message: string): string {
 		return `I'd suggest blocking out focused time for this. Here's a recommended schedule:\n\n- **Morning (9-11 AM)** — Deep work block\n- **After lunch (1-2 PM)** — Follow-up and communication\n- **Afternoon (3-4 PM)** — Review and planning\n\nWant me to add these time blocks to your calendar?`;
 	}
 	if (lower.includes('productivity') || lower.includes('efficient')) {
-		return `Here are some productivity tips:\n\n✅ **Two-minute rule** — If it takes less than 2 minutes, do it now\n✅ **Time boxing** — Set fixed time limits for tasks\n✅ **Batch similar tasks** — Group emails, calls, etc.\n✅ **Take breaks** — Use the Pomodoro technique (25 min work / 5 min break)\n\nYour current completion rate is looking good! Keep it up. 🎯`;
+		return `Here are some productivity tips:\n\n- **Two-minute rule** — If it takes less than 2 minutes, do it now\n- **Time boxing** — Set fixed time limits for tasks\n- **Batch similar tasks** — Group emails, calls, etc.\n- **Take breaks** — Use the Pomodoro technique (25 min work / 5 min break)\n\nYour current completion rate is looking good! Keep it up.`;
 	}
 	if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-		return `Hey there! 👋 I'm your FlowPlan AI assistant. I can help you with:\n\n- 📋 **Task management** — Create and organize tasks\n- 📅 **Scheduling** — Plan your calendar and time blocks\n- 💡 **Productivity tips** — Get personalized advice\n- 📊 **Insights** — Understand your work patterns\n\nWhat would you like help with?`;
+		return `Hey there! I'm your FlowPlan AI assistant. I can help you with:\n\n- **Task management** — Create and organize tasks\n- **Scheduling** — Plan your calendar and time blocks\n- **Productivity tips** — Get personalized advice\n- **Insights** — Understand your work patterns\n\nWhat would you like help with?`;
 	}
 
 	return `Great question! Here's my take:\n\nBased on your current workload, I'd recommend prioritizing your most important task first thing in the morning when your energy is highest.\n\n**Quick action items:**\n1. Review your task list for today\n2. Identify your top 3 priorities\n3. Block focus time on your calendar\n\nNeed help with anything specific? I can create tasks, schedule events, or suggest optimizations.`;

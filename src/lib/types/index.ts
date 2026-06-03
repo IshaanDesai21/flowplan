@@ -1,10 +1,9 @@
-export type Theme = 'light' | 'dark' | 'midnight' | 'forest' | 'slate' | 'cream';
+export type Theme = 'light' | 'dark' | 'midnight' | 'slate' | 'cream';
 
 export const THEMES: { id: Theme; label: string; accent: string; bg: string }[] = [
 	{ id: 'light', label: 'Light', accent: '#6366f1', bg: '#fafafa' },
 	{ id: 'dark', label: 'Dark', accent: '#818cf8', bg: '#09090b' },
 	{ id: 'midnight', label: 'Midnight', accent: '#38bdf8', bg: '#020617' },
-	{ id: 'forest', label: 'Forest', accent: '#4ade80', bg: '#022c22' },
 	{ id: 'slate', label: 'Slate', accent: '#94a3b8', bg: '#0f172a' },
 	{ id: 'cream', label: 'Cream', accent: '#d97706', bg: '#fefce8' }
 ];
@@ -100,9 +99,8 @@ export const NAV_ITEMS: NavItem[] = [
 	{ href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
 	{ href: '/calendar', label: 'Calendar', icon: 'calendar' },
 	{ href: '/tasks', label: 'Tasks', icon: 'tasks' },
-	{ href: '/checklists', label: 'Checklists', icon: 'checklists' },
-	{ href: '/meetings', label: 'Meetings', icon: 'meetings' },
-	{ href: '/ai', label: 'AI Assistant', icon: 'ai' },
+	{ href: '/focus', label: 'Focus Timer', icon: 'focus' },
 	{ href: '/analytics', label: 'Analytics', icon: 'analytics' },
+	{ href: '/ai', label: 'FlowPlan AI', icon: 'ai' },
 	{ href: '/settings', label: 'Settings', icon: 'settings' }
 ];

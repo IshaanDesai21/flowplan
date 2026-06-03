@@ -1,10 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 // ─── Authentication ───────────────────────────────────────────
@@ -55,9 +56,9 @@ model Task {
   description       String?
   dueDate           DateTime?
   dueTime           String?
-  priority          TaskPriority @default(MEDIUM)
+  priority          String       @default("MEDIUM")
   category          String?
-  status            TaskStatus   @default(NOT_STARTED)
+  status            String       @default("NOT_STARTED")
   estimatedDuration Int?         // minutes
   notes             String?
   position          Int          @default(0)
@@ -75,22 +76,7 @@ model Task {
   @@index([priority])
 }
 
-enum TaskStatus {
-  NOT_STARTED
-  PLANNED
-  IN_PROGRESS
-  WAITING
-  BLOCKED
-  COMPLETED
-  ARCHIVED
-}
 
-enum TaskPriority {
-  CRITICAL
-  HIGH
-  MEDIUM
-  LOW
-}
 
 // ─── Calendar Events ──────────────────────────────────────────
 
@@ -102,8 +88,8 @@ model CalendarEvent {
   startTime      DateTime
   endTime        DateTime
   location       String?
-  priority       TaskPriority @default(MEDIUM)
-  tags           String[]    @default([])
+  priority       String       @default("MEDIUM")
+  tags           String       @default("[]")
   status         String       @default("confirmed") // confirmed | tentative | cancelled
   color          String       @default("#6366f1")
   isRecurring    Boolean      @default(false)
@@ -164,7 +150,7 @@ model ChecklistTemplate {
   id       String @id @default(uuid())
   name     String
   category String?
-  items    Json   // Array of { title, children: [...] }
+  items    String   // Array of { title, children: [...] }
 }
 
 // ─── Meetings ─────────────────────────────────────────────────
@@ -175,9 +161,9 @@ model Meeting {
   title        String
   startTime    DateTime
   endTime      DateTime
-  participants String[] @default([])
+  participants String @default("[]")
   notes        String?
-  actionItems  Json?    // Array of { text, completed }
+  actionItems  String?    // Array of { text, completed }
   location     String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -279,10 +265,10 @@ model UserSettings {
   id                  String @id @default(uuid())
   userId              String @unique
   theme               String @default("dark")
-  notificationPrefs   Json   @default("{\"inApp\": true, \"email\": false, \"push\": false}")
-  productivityPrefs   Json   @default("{\"workStartHour\": 9, \"workEndHour\": 17, \"focusDuration\": 25}")
-  googleIntegration   Json   @default("{\"connected\": false}")
-  aiSettings          Json   @default("{\"apiKey\": \"\", \"contextLevel\": \"full\"}")
+  notificationPrefs   String   @default("{\"inApp\": true, \"email\": false, \"push\": false}")
+  productivityPrefs   String   @default("{\"workStartHour\": 9, \"workEndHour\": 17, \"focusDuration\": 25}")
+  googleIntegration   String   @default("{\"connected\": false}")
+  aiSettings          String   @default("{\"apiKey\": \"\", \"contextLevel\": \"full\"}")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

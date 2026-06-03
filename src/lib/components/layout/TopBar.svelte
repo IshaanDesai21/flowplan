@@ -5,9 +5,18 @@
 	interface Props {
 		user: { id: string; name: string; email: string; avatarUrl: string | null };
 		isMobile: boolean;
+		onSearch?: () => void;
 	}
 
-	let { user, isMobile }: Props = $props();
+	let { user, isMobile, onSearch }: Props = $props();
+
+	let searchActive = $state(false);
+
+	function handleSearch() {
+		searchActive = true;
+		setTimeout(() => searchActive = false, 300);
+		onSearch?.();
+	}
 
 	const pageTitle = $derived(() => {
 		const path = $page.url.pathname;
@@ -28,7 +37,7 @@
 <header class="topbar">
 	<div class="topbar-left">
 		{#if isMobile}
-			<button class="menu-btn" onclick={() => sidebar.toggle()}>
+			<button class="menu-btn" onclick={() => sidebar.toggle()} aria-label="Toggle Menu">
 				<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<line x1="3" y1="6" x2="21" y2="6" />
 					<line x1="3" y1="12" x2="21" y2="12" />
@@ -40,28 +49,32 @@
 	</div>
 
 	<div class="topbar-right">
-		<!-- Search placeholder -->
-		<div class="search-box">
+		<button
+			class="search-box"
+			class:active={searchActive}
+			onclick={handleSearch}
+			aria-label="Search"
+		>
 			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 				<circle cx="11" cy="11" r="8" />
 				<path d="m21 21-4.35-4.35" />
 			</svg>
 			<span>Search...</span>
 			<kbd>⌘K</kbd>
-		</div>
+		</button>
 
 		<!-- Quick add -->
-		<button class="icon-btn" title="Quick Add" id="topbar-quick-add">
+		<a href="/tasks?new=true" class="icon-btn" title="Quick Add Task" id="topbar-quick-add" aria-label="Quick Add Task">
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 				<line x1="12" y1="5" x2="12" y2="19" />
 				<line x1="5" y1="12" x2="19" y2="12" />
 			</svg>
-		</button>
+		</a>
 
 		<!-- User menu -->
 		<div class="user-chip">
 			<div class="avatar-sm">
-				{user.name.charAt(0).toUpperCase()}
+				{user?.name?.charAt(0)?.toUpperCase() || 'U'}
 			</div>
 		</div>
 	</div>
@@ -117,18 +130,38 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.5rem 0.75rem;
+		padding: 0.45rem 0.875rem;
 		border-radius: var(--radius-md);
 		border: 1px solid var(--color-border);
-		background: var(--color-bg);
-		color: var(--color-text-tertiary);
+		background: var(--color-surface);
+		color: var(--color-text-secondary);
 		font-size: 0.8rem;
 		cursor: pointer;
 		transition: all var(--transition-fast);
 		min-width: 200px;
+		outline: none;
+		text-align: left;
+		width: auto;
+		font-family: inherit;
 	}
 	.search-box:hover {
 		border-color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 5%, var(--color-surface));
+		color: var(--color-text);
+	}
+	.search-box:focus-visible {
+		border-color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+		color: var(--color-text);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+	}
+	.search-box:active,
+	.search-box.active {
+		border-color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+		color: var(--color-text);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+		transform: scale(0.98);
 	}
 	.search-box kbd {
 		margin-left: auto;

@@ -3,6 +3,8 @@
 	import Modal from '$lib/components/ui/Modal.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import Dropdown from '$lib/components/ui/Dropdown.svelte';
+	import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, PRIORITY_LABELS, PRIORITY_COLORS } from '$lib/types/index.js';
 
 	let { isOpen, task = null, initialStatus = 'NOT_STARTED', onclose, onsave } = $props();
 
@@ -52,6 +54,20 @@
 			category
 		});
 	}
+
+	const priorityOptions = [
+		{ value: 'LOW', label: PRIORITY_LABELS.LOW, color: PRIORITY_COLORS.LOW },
+		{ value: 'MEDIUM', label: PRIORITY_LABELS.MEDIUM, color: PRIORITY_COLORS.MEDIUM },
+		{ value: 'HIGH', label: PRIORITY_LABELS.HIGH, color: PRIORITY_COLORS.HIGH },
+		{ value: 'CRITICAL', label: PRIORITY_LABELS.CRITICAL, color: PRIORITY_COLORS.CRITICAL }
+	];
+
+	const statusOptions = [
+		{ value: 'NOT_STARTED', label: TASK_STATUS_LABELS.NOT_STARTED, color: TASK_STATUS_COLORS.NOT_STARTED },
+		{ value: 'IN_PROGRESS', label: TASK_STATUS_LABELS.IN_PROGRESS, color: TASK_STATUS_COLORS.IN_PROGRESS },
+		{ value: 'WAITING', label: TASK_STATUS_LABELS.WAITING, color: TASK_STATUS_COLORS.WAITING },
+		{ value: 'COMPLETED', label: TASK_STATUS_LABELS.COMPLETED, color: TASK_STATUS_COLORS.COMPLETED }
+	];
 </script>
 
 <Modal {isOpen} {onclose} title={task ? 'Edit Task' : 'New Task'}>
@@ -81,33 +97,19 @@
 				bind:value={dueDateStr} 
 			/>
 			
-			<div class="flex flex-col gap-1.5">
-				<label class="text-sm font-medium text-secondary">Priority</label>
-				<select 
-					bind:value={priority}
-					class="flex h-10 w-full rounded-md border border-default bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] text-primary"
-				>
-					<option value="LOW">Low</option>
-					<option value="MEDIUM">Medium</option>
-					<option value="HIGH">High</option>
-					<option value="CRITICAL">Critical</option>
-				</select>
-			</div>
+			<Dropdown
+				label="Priority"
+				options={priorityOptions}
+				bind:value={priority}
+			/>
 		</div>
 
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-			<div class="flex flex-col gap-1.5">
-				<label class="text-sm font-medium text-secondary">Status</label>
-				<select 
-					bind:value={status}
-					class="flex h-10 w-full rounded-md border border-default bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] text-primary"
-				>
-					<option value="NOT_STARTED">To Do</option>
-					<option value="IN_PROGRESS">In Progress</option>
-					<option value="COMPLETED">Done</option>
-					<option value="WAITING">Waiting</option>
-				</select>
-			</div>
+			<Dropdown
+				label="Status"
+				options={statusOptions}
+				bind:value={status}
+			/>
 
 			<Input 
 				name="category" 

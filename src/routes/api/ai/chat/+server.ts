@@ -1,48 +1,37 @@
-import { json } from '@sveltejs/kit';
-import { db } from '$lib/server/db.js';
-import { generateAIResponse } from '$lib/server/ai/gemini.js';
 import { buildUserContext } from '$lib/server/ai/context.js';
+import * as nvidia from '$lib/server/ai/nvidia.js';
 import type { RequestHandler } from './$types.js';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	if (!locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
+	if (!locals.user) return new Response('Unauthorized', { status: 401 });
 
 	try {
-		const { conversationId, message } = await request.json();
+		const { message } = await request.json();
+		if (!message?.trim()) return new Response('Message required', { status: 400 });
 
-		// Save user message
-		await db.aIMessage.create({
-			data: {
-				conversationId,
-				role: 'user',
-				content: message
-			}
-		});
-
-		// Fetch user context (tasks, events)
 		const context = await buildUserContext(locals.user.id);
+		const engine = nvidia;
 
-		// Get AI response (mock or real Gemini)
-		const aiResponse = await generateAIResponse(message, context);
+		// Try streaming first (fastest UX)
+		const stream = await engine.generateAIStream(message, context);
 
-		// Save assistant message
-		const savedMessage = await db.aIMessage.create({
-			data: {
-				conversationId,
-				role: 'assistant',
-				content: aiResponse
-			}
+		if (stream) {
+			return new Response(stream, {
+				headers: {
+					'Content-Type': 'text/plain; charset=utf-8',
+					'X-Content-Type-Options': 'nosniff',
+					'Cache-Control': 'no-cache, no-transform'
+				}
+			});
+		}
+
+		// Fallback: non-streaming
+		const content = await engine.generateAIResponse(message, context);
+		return new Response(content, {
+			headers: { 'Content-Type': 'text/plain; charset=utf-8' }
 		});
-
-		// Update conversation timestamp
-		await db.aIConversation.update({
-			where: { id: conversationId },
-			data: { updatedAt: new Date() }
-		});
-
-		return json({ message: savedMessage });
 	} catch (error) {
 		console.error('AI Chat Error:', error);
-		return json({ error: 'Failed to process message' }, { status: 500 });
+		return new Response('Error processing message', { status: 500 });
 	}
 };

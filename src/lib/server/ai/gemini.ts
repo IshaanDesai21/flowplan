@@ -1,70 +1,102 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { env } from '$env/dynamic/private';
 import type { AIContext } from './context.js';
 
-const apiKey = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = env.GEMINI_API_KEY || '';
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-let genAI: GoogleGenerativeAI | null = null;
-if (apiKey) {
-	genAI = new GoogleGenerativeAI(apiKey);
+const SYSTEM_PROMPT = `You are FlowPlan AI, a highly intelligent productivity assistant powered by Gemini.
+You have access to the user's tasks and calendar events.
+
+TONE & FORMAT RULES — follow these strictly:
+- Always respond in a formal, professional tone. No casual language, slang, or overly enthusiastic phrases.
+- Always express times in 12-hour format with AM/PM (e.g. "9:00 AM", "2:30 PM", not "14:30" or "9h").
+- Format responses in clean markdown: use **bold** for emphasis, bullet lists for multiple points, and headers for sections.
+- Be concise and action-oriented. Prioritize what is most useful to the user.
+- Do not hallucinate tasks or events that are not present in the context.
+- When referring to deadlines or schedule items, always use 12-hour time and include the date.`;
+
+function buildContextString(context: AIContext): string {
+	return `
+CURRENT TIME: ${context.today}
+UPCOMING TASKS (${context.tasks.length} total): ${JSON.stringify(context.tasks.slice(0, 15), null, 2)}
+UPCOMING EVENTS (NEXT 7 DAYS, ${context.events.length} total): ${JSON.stringify(context.events.slice(0, 10), null, 2)}
+`;
 }
 
-const SYSTEM_PROMPT = `You are FlowPlan AI, a highly intelligent and helpful productivity assistant.
-You have access to the user's tasks and calendar events.
-Your goal is to help them plan their day, prioritize work, find schedule conflicts, and stay productive.
-
-Keep your responses concise, actionable, and formatted in clean markdown. Use bullet points and bold text for emphasis.
-If they ask what to work on, look at their tasks (focus on CRITICAL/HIGH priority or due dates) and events.
-Do not hallucinate tasks or events that are not in the context.`;
-
-export async function generateAIResponse(message: string, context: AIContext): Promise<string> {
-	const contextString = `
-CURRENT TIME: ${context.today}
-UPCOMING TASKS: ${JSON.stringify(context.tasks)}
-UPCOMING EVENTS (NEXT 7 DAYS): ${JSON.stringify(context.events)}
-`;
-
-	if (genAI) {
-		try {
-			const model = genAI.getGenerativeModel({
-				model: 'gemini-1.5-flash',
-				systemInstruction: SYSTEM_PROMPT
-			});
-
-			const prompt = `Context data:\n${contextString}\n\nUser message: ${message}`;
-			const result = await model.generateContent(prompt);
-			const response = await result.response;
-			return response.text();
-		} catch (error) {
-			console.error('Gemini API Error:', error);
-			return fallbackResponse(message);
-		}
-	} else {
-		// Mock response if no API key
-		await new Promise((resolve) => setTimeout(resolve, 1000));
-		return fallbackResponse(message, context);
+/** Returns a streaming ReadableStream of text tokens from Gemini */
+export async function generateAIStream(
+	message: string,
+	context: AIContext
+): Promise<ReadableStream<Uint8Array> | null> {
+	try {
+		const model = genAI.getGenerativeModel({ 
+			model: "gemini-1.5-pro",
+			systemInstruction: SYSTEM_PROMPT
+		});
+		
+		const prompt = `User Context:\n${buildContextString(context)}\n\nUser Message: ${message}`;
+		const result = await model.generateContentStream(prompt);
+		
+		const encoder = new TextEncoder();
+		
+		return new ReadableStream({
+			async start(controller) {
+				try {
+					for await (const chunk of result.stream) {
+						const chunkText = chunk.text();
+						controller.enqueue(encoder.encode(chunkText));
+					}
+				} catch (e) {
+					console.error("Gemini stream chunk error", e);
+				} finally {
+					controller.close();
+				}
+			}
+		});
+	} catch (err) {
+		console.error('Gemini streaming error:', err);
+		return null;
 	}
 }
 
-function fallbackResponse(message: string, context?: AIContext): string {
+/** Non-streaming fallback */
+export async function generateAIResponse(message: string, context: AIContext): Promise<string> {
+	try {
+		const model = genAI.getGenerativeModel({ 
+			model: "gemini-1.5-pro",
+			systemInstruction: SYSTEM_PROMPT
+		});
+		
+		const prompt = `User Context:\n${buildContextString(context)}\n\nUser Message: ${message}`;
+		const result = await model.generateContent(prompt);
+		
+		return result.response.text();
+	} catch (err) {
+		console.error('Gemini API fetch error:', err);
+		return fallbackResponse(message, err, context);
+	}
+}
+
+function fallbackResponse(message: string, err: any, context?: AIContext): string {
 	const lowerMsg = message.toLowerCase();
 	
+	const errStr = err instanceof Error ? err.message : String(err);
+	const errPrefix = `*(Gemini API Error: ${errStr})*\n\n`;
+
 	if (lowerMsg.includes('work on') || lowerMsg.includes('priority') || lowerMsg.includes('first')) {
 		if (context && context.tasks.length > 0) {
-			const highPriority = context.tasks.find(t => t.priority === 'CRITICAL' || t.priority === 'HIGH');
-			if (highPriority) {
-				return `Based on your tasks, I recommend starting with **${highPriority.title}** as it's marked as high priority.`;
-			}
-			return `You have ${context.tasks.length} pending tasks. I'd suggest starting with **${context.tasks[0].title}** to get some momentum.`;
+			const highPriority = context.tasks.find((t) => t.priority === 'CRITICAL' || t.priority === 'HIGH');
+			if (highPriority)
+				return `${errPrefix}I'd suggest starting with **${highPriority.title}** since it's high priority! Let me know if you want to break it down.`;
+			return `${errPrefix}You've got ${context.tasks.length} tasks lined up. Let's start with **${context.tasks[0].title}** to get some momentum!`;
 		}
-		return "You don't have any pending tasks right now. Great job! Would you like to create some?";
+		return `${errPrefix}You don't have any pending tasks right now. Ready to plan some for tomorrow?`;
 	}
-	
-	if (lowerMsg.includes('plan') || lowerMsg.includes('day')) {
-		if (context && context.events.length > 0) {
-			return `You have ${context.events.length} events scheduled soon. I recommend tackling your most complex tasks in the gaps between these meetings.`;
-		}
-		return "Your schedule looks clear today. This is a great opportunity to block out time for deep, focused work.";
+	if (lowerMsg.includes('hello') || lowerMsg.includes('hi') || lowerMsg.includes('hey')) {
+		const taskCount = context?.tasks.length || 0;
+		const eventCount = context?.events.length || 0;
+		return `${errPrefix}Hey there! I'm your **FlowPlan AI**.\n\nHere's a quick look at your plate:\n- **${taskCount} active tasks** pending\n- **${eventCount} events** scheduled this week\n\nWhat can I help you tackle today?`;
 	}
-
-	return "**Demo Mode**: To unlock full AI capabilities, add a Gemini API key to the environment variables.\n\nFor now, I can tell you that you're doing great! Keep up the good work.";
+	return `${errPrefix}I'm here to help you stay on top of things! Ask me about your schedule, tasks, or planning out your week.`;
 }

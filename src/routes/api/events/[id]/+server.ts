@@ -15,7 +15,7 @@ export const PUT: RequestHandler = async ({ locals, params, request }) => {
 			...(data.endTime !== undefined && { endTime: new Date(data.endTime) }),
 			...(data.location !== undefined && { location: data.location }),
 			...(data.priority !== undefined && { priority: data.priority }),
-			...(data.tags !== undefined && { tags: data.tags }),
+			...(data.tags !== undefined && { tags: JSON.stringify(data.tags) }),
 			...(data.status !== undefined && { status: data.status }),
 			...(data.color !== undefined && { color: data.color }),
 			...(data.isRecurring !== undefined && { isRecurring: data.isRecurring }),

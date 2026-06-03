@@ -9,7 +9,18 @@ export const GET: RequestHandler = async ({ locals }) => {
 		where: { userId: locals.user.id }
 	});
 
-	return json(settings || { theme: 'dark' });
+	let parsedSettings = null;
+	if (settings) {
+		parsedSettings = {
+			...settings,
+			notificationPrefs: JSON.parse(settings.notificationPrefs || '{}'),
+			productivityPrefs: JSON.parse(settings.productivityPrefs || '{}'),
+			googleIntegration: JSON.parse(settings.googleIntegration || '{}'),
+			aiSettings: JSON.parse(settings.aiSettings || '{}')
+		};
+	}
+
+	return json(parsedSettings || { theme: 'dark' });
 };
 
 export const PUT: RequestHandler = async ({ locals, request }) => {
@@ -20,10 +31,10 @@ export const PUT: RequestHandler = async ({ locals, request }) => {
 		where: { userId: locals.user.id },
 		update: {
 			...(data.theme !== undefined && { theme: data.theme }),
-			...(data.notificationPrefs !== undefined && { notificationPrefs: data.notificationPrefs }),
-			...(data.productivityPrefs !== undefined && { productivityPrefs: data.productivityPrefs }),
-			...(data.googleIntegration !== undefined && { googleIntegration: data.googleIntegration }),
-			...(data.aiSettings !== undefined && { aiSettings: data.aiSettings })
+			...(data.notificationPrefs !== undefined && { notificationPrefs: JSON.stringify(data.notificationPrefs) }),
+			...(data.productivityPrefs !== undefined && { productivityPrefs: JSON.stringify(data.productivityPrefs) }),
+			...(data.googleIntegration !== undefined && { googleIntegration: JSON.stringify(data.googleIntegration) }),
+			...(data.aiSettings !== undefined && { aiSettings: JSON.stringify(data.aiSettings) })
 		},
 		create: {
 			userId: locals.user.id,
@@ -31,5 +42,11 @@ export const PUT: RequestHandler = async ({ locals, request }) => {
 		}
 	});
 
-	return json(settings);
+	return json({
+		...settings,
+		notificationPrefs: JSON.parse(settings.notificationPrefs || '{}'),
+		productivityPrefs: JSON.parse(settings.productivityPrefs || '{}'),
+		googleIntegration: JSON.parse(settings.googleIntegration || '{}'),
+		aiSettings: JSON.parse(settings.aiSettings || '{}')
+	});
 };

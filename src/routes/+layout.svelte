@@ -4,10 +4,14 @@
 	import { theme } from '$lib/stores/theme.js';
 	import ToastProvider from '$lib/components/ui/ToastProvider.svelte';
 
-	let { children } = $props();
+	let { data, children } = $props();
 
 	onMount(() => {
-		theme.initialize();
+		if (data.settings?.theme) {
+			theme.set(data.settings.theme as any);
+		} else {
+			theme.initialize();
+		}
 	});
 </script>
 

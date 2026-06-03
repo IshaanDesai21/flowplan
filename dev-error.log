@@ -1,0 +1,15 @@
+PrismaClientInitializationError: 
+Invalid `prisma.userSettings.findUnique()` invocation:
+
+
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+    at $n.handleRequestError (/Users/ishaandesai/Documents/Webapp/node_modules/@prisma/client/runtime/library.js:121:7615)
+    at $n.handleAndLogRequestError (/Users/ishaandesai/Documents/Webapp/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/Users/ishaandesai/Documents/Webapp/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/Users/ishaandesai/Documents/Webapp/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async load (/Users/ishaandesai/Documents/Webapp/src/routes/+layout.server.ts:7:14)
+    at async fn (/Users/ishaandesai/Documents/Webapp/node_modules/@sveltejs/kit/src/runtime/server/page/load_data.js?v=d029cd0e:86:19)
+    at async load_server_data (/Users/ishaandesai/Documents/Webapp/node_modules/@sveltejs/kit/src/runtime/server/page/load_data.js?v=d029cd0e:76:17)
+    at async eval (/Users/ishaandesai/Documents/Webapp/node_modules/@sveltejs/kit/src/runtime/server/page/index.js?v=d029cd0e:193:26)

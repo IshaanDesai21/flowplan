@@ -24,10 +24,9 @@
 		dashboard: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
 		calendar: 'M3 6a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6zM16 2v4M8 2v4M3 10h18',
 		tasks: 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11',
-		checklists: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5h6M9 14l2 2 4-4',
-		meetings: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2M9 7a4 4 0 110 8 4 4 0 010-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
-		ai: 'M12 2a8 8 0 00-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 00-8-8zM12 10a2 2 0 110 4 2 2 0 010-4z',
+		focus: 'M12 2a10 10 0 110 20A10 10 0 0112 2zM12 6v6l4 2',
 		analytics: 'M18 20V10M12 20V4M6 20v-6',
+		ai: 'M12 3l-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z',
 		settings: 'M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z'
 	};
 </script>
@@ -71,20 +70,22 @@
 			</svg>
 		</button>
 		{#if !collapsed}
-			<div class="user-info">
-				<div class="user-avatar">
-					{user.name.charAt(0).toUpperCase()}
+			<div class="user-footer-row">
+				<div class="user-info">
+					<div class="user-avatar">
+						{user.name.charAt(0).toUpperCase()}
+					</div>
+					<div class="user-details">
+						<span class="user-name">{user.name}</span>
+						<span class="user-email">{user.email}</span>
+					</div>
 				</div>
-				<div class="user-details">
-					<span class="user-name">{user.name}</span>
-					<span class="user-email">{user.email}</span>
-				</div>
+				<button class="logout-btn" onclick={handleLogout} title="Sign out">
+					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+					</svg>
+				</button>
 			</div>
-			<button class="logout-btn" onclick={handleLogout} title="Sign out">
-				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
-				</svg>
-			</button>
 		{/if}
 	</div>
 </aside>
@@ -178,11 +179,20 @@
 	.collapse-btn :global(.rotated) {
 		transform: rotate(180deg);
 	}
+	.user-footer-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		width: 100%;
+		gap: 0.25rem;
+	}
 	.user-info {
 		display: flex;
 		align-items: center;
 		gap: 0.625rem;
 		padding: 0.5rem;
+		flex: 1;
+		min-width: 0;
 	}
 	.user-avatar {
 		width: 34px;
@@ -221,16 +231,21 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 0.5rem;
-		border-radius: var(--radius-md);
-		background: none;
-		border: none;
-		color: var(--color-text-tertiary);
+		width: 32px;
+		height: 32px;
+		padding: 0;
+		border-radius: 8px; /* small rounded square */
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		color: var(--color-text-secondary);
 		cursor: pointer;
 		transition: all var(--transition-fast);
+		flex-shrink: 0;
+		margin-right: 0.5rem;
 	}
 	.logout-btn:hover {
 		background: var(--color-danger-light);
 		color: var(--color-danger);
+		border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
 	}
 </style>

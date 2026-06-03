@@ -12,9 +12,9 @@ export const PUT: RequestHandler = async ({ locals, params, request }) => {
 			...(data.title !== undefined && { title: data.title }),
 			...(data.startTime !== undefined && { startTime: new Date(data.startTime) }),
 			...(data.endTime !== undefined && { endTime: new Date(data.endTime) }),
-			...(data.participants !== undefined && { participants: data.participants }),
+			...(data.participants !== undefined && { participants: JSON.stringify(data.participants) }),
 			...(data.notes !== undefined && { notes: data.notes }),
-			...(data.actionItems !== undefined && { actionItems: data.actionItems }),
+			...(data.actionItems !== undefined && { actionItems: data.actionItems ? JSON.stringify(data.actionItems) : null }),
 			...(data.location !== undefined && { location: data.location })
 		}
 	});

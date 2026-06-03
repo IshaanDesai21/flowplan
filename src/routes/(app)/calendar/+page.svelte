@@ -5,10 +5,12 @@
 	import { getMonthDays, formatTime } from '$lib/utils/dates.js';
 	import EventModal from '$lib/components/calendar/EventModal.svelte';
 
+	import { page } from '$app/stores';
+
 	let { data } = $props();
 
 	let currentDate = $state(new Date(data.baseDate));
-	let view = $state('month');
+	let view = $state($page.url.searchParams.get('view') ?? 'month');
 	let isEventModalOpen = $state(false);
 	let selectedDate = $state<Date>(new Date());
 	let selectedEvent = $state<any>(null);
@@ -129,15 +131,17 @@
 								{#each getEventsForDay(day).slice(0, 3) as event}
 									<div 
 										class="event-pill" 
-										style="background-color: {event.color}; color: #fff"
+										style="background: color-mix(in srgb, {event.color} 15%, var(--color-surface)); border-left: 2px solid {event.color}; color: var(--color-text)"
 										title="{formatTime(event.startTime)} - {event.title}"
 										onclick={(e) => openEditEventModal(event, e)}
 									>
-										{formatTime(event.startTime)} {event.title}
+										{event.title}
 									</div>
 								{/each}
 								{#if getEventsForDay(day).length > 3}
-									<div class="event-more">+{getEventsForDay(day).length - 3} more</div>
+									<!-- svelte-ignore a11y_click_events_have_key_events -->
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
+									<div class="event-more" onclick={(e) => { e.stopPropagation(); currentDate = day; view = 'day'; }}>+{getEventsForDay(day).length - 3} more</div>
 								{/if}
 							</div>
 						</div>
@@ -177,7 +181,7 @@
 									
 									<div 
 										class="absolute-event"
-										style="top: {top}%; height: {Math.max(height, 2)}%; background-color: color-mix(in srgb, {event.color} 15%, transparent); border-left: 3px solid {event.color}; color: {event.color}"
+										style="top: {top}%; height: {Math.max(height, 2)}%; background-color: {event.color}; color: white;"
 										onclick={(e) => openEditEventModal(event, e)}
 									>
 										<div class="abs-ev-title">{event.title}</div>
@@ -189,9 +193,75 @@
 					</div>
 				</div>
 			</div>
-		{:else}
-			<div class="flex items-center justify-center h-full text-secondary">
-				<p>{view} view is under construction</p>
+		{:else if view === 'day'}
+			<div class="day-view week-view">
+				<div class="week-header">
+					<div class="time-col-header"></div>
+					<div class="week-day-header is-today">
+						<span class="wd-name">{format(currentDate, 'EEE')}</span>
+						<span class="wd-num">{format(currentDate, 'd')}</span>
+					</div>
+				</div>
+				<div class="week-grid-scroll">
+					<div class="week-grid">
+						<div class="time-col">
+							{#each hours as hour}
+								<div class="time-slot">{hour === 0 ? '' : format(new Date().setHours(hour, 0), 'h a')}</div>
+							{/each}
+						</div>
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="day-col" onclick={() => openNewEventModal(currentDate)}>
+							{#each hours as hour}
+								<div class="hour-cell border-b border-default"></div>
+							{/each}
+							
+							{#each getEventsForDay(currentDate) as event}
+								{@const top = (event.startTime.getHours() * 60 + event.startTime.getMinutes()) / (24 * 60) * 100}
+								{@const duration = (event.endTime.getTime() - event.startTime.getTime()) / 60000}
+								{@const height = (duration / (24 * 60)) * 100}
+								
+								<div 
+									class="absolute-event"
+									style="top: {top}%; height: {Math.max(height, 2)}%; background: color-mix(in srgb, {event.color} 12%, var(--color-surface)); border-left: 3px solid {event.color}; color: var(--color-text)"
+									onclick={(e) => openEditEventModal(event, e)}
+								>
+									<div class="abs-ev-title">{event.title}</div>
+									<div class="abs-ev-time">{formatTime(event.startTime)}</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</div>
+			</div>
+		{:else if view === 'agenda'}
+			<div class="agenda-view overflow-y-auto h-full p-4">
+				{#if events.length === 0}
+					<div class="flex items-center justify-center h-full text-secondary">
+						<p>No events scheduled.</p>
+					</div>
+				{:else}
+					<div class="space-y-4 max-w-3xl mx-auto">
+						{#each events.sort((a, b) => a.startTime.getTime() - b.startTime.getTime()) as event}
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<div class="flex gap-4 p-4 rounded-xl border border-default bg-surface hover:border-accent transition-colors cursor-pointer" onclick={(e) => openEditEventModal(event, e)}>
+								<div class="w-16 flex-shrink-0 text-right">
+									<div class="text-sm font-semibold text-primary">{formatTime(event.startTime)}</div>
+									<div class="text-xs text-secondary">{formatTime(event.endTime)}</div>
+								</div>
+								<div class="w-1 rounded-full" style="background-color: {event.color}"></div>
+								<div class="flex-1">
+									<div class="font-medium text-primary">{event.title}</div>
+									<div class="text-sm text-secondary">{format(event.startTime, 'MMM d, yyyy')}</div>
+									{#if event.location}
+										<div class="text-sm text-tertiary mt-1">{event.location}</div>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>
@@ -335,13 +405,15 @@
 	}
 	.event-pill {
 		font-size: 0.7rem;
-		padding: 2px 4px;
+		padding: 2px 5px;
 		border-radius: 4px;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		font-weight: 500;
 		cursor: pointer;
+		border-left-width: 2px;
+		border-left-style: solid;
 	}
 	.event-pill:hover { filter: brightness(0.9); }
 	.event-more {
@@ -349,7 +421,10 @@
 		color: var(--color-text-tertiary);
 		text-align: center;
 		font-weight: 600;
+		cursor: pointer;
+		transition: color 0.15s;
 	}
+	.event-more:hover { color: var(--color-accent); }
 
 	/* Week View */
 	.week-view {

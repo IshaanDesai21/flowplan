@@ -13,6 +13,45 @@
 		if (hour < 18) return 'Good afternoon';
 		return 'Good evening';
 	});
+
+	// Typewriter for AI summary
+	let displayedSummary = $state('');
+	let summaryFull = $state('');
+
+	function startTypewriter(text: string) {
+		summaryFull = text;
+		displayedSummary = '';
+		let i = 0;
+		const interval = setInterval(() => {
+			i++;
+			displayedSummary = text.slice(0, i);
+			if (i >= text.length) clearInterval(interval);
+		}, 22);
+	}
+
+	// Circle checkbox with undo-delay (matches tasks page behavior)
+	let completingIds = $state(new Map<string, ReturnType<typeof setTimeout>>());
+
+	function handleCheck(taskId: string) {
+		if (completingIds.has(taskId)) {
+			clearTimeout(completingIds.get(taskId)!);
+			const next = new Map(completingIds);
+			next.delete(taskId);
+			completingIds = next;
+			return;
+		}
+		const timer = setTimeout(() => {
+			const next = new Map(completingIds);
+			next.delete(taskId);
+			completingIds = next;
+			// optimistic remove from list
+			data = { ...data, todayTasks: data.todayTasks.filter((t: any) => t.id !== taskId), upcomingTasks: data.upcomingTasks.filter((t: any) => t.id !== taskId) };
+			fetch(`/api/tasks/${taskId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'DONE' }) }).catch(console.error);
+		}, 700);
+		const next = new Map(completingIds);
+		next.set(taskId, timer);
+		completingIds = next;
+	}
 </script>
 
 <svelte:head>
@@ -22,24 +61,28 @@
 <div class="dashboard">
 	<!-- Header -->
 	<div class="dashboard-header">
-		<div>
-			<h1 class="greeting">{greeting()}, {data.user.name.split(' ')[0]}</h1>
-			<p class="date-subtitle">{formatDate(new Date())}</p>
-		</div>
-		<div class="header-actions">
-			<Button variant="outline" size="sm">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2">
-					<circle cx="12" cy="12" r="10" />
-					<polyline points="12 6 12 12 16 14" />
-				</svg>
-				Focus Mode
-			</Button>
-			<Button variant="primary" size="sm">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2">
-					<path d="M12 5v14M5 12h14" />
-				</svg>
-				New Task
-			</Button>
+		<div class="header-left">
+			<div class="greeting-container">
+				<h1 class="greeting">{greeting()}, {data.user.name.split(' ')[0]}</h1>
+				<p class="date-subtitle">{formatDate(new Date())}</p>
+			</div>
+			{#if data.streamed?.aiSummary}
+				<div class="ai-summary">
+					<div class="ai-badge">FlowPlan AI</div>
+					<div class="summary-content">
+						{#await data.streamed.aiSummary}
+							<div class="summary-skeleton">
+								<div class="skeleton-line" style="width: 80%"></div>
+							</div>
+						{:then aiSummary}
+							{@const _ = (() => { startTypewriter(aiSummary); return ''; })()}
+							<p class="typewriter-text">{displayedSummary}<span class="cursor" class:hidden={displayedSummary === summaryFull}></span></p>
+						{:catch}
+							<p>Ready to tackle your tasks today?</p>
+						{/await}
+					</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 
@@ -92,7 +135,10 @@
 			<section class="widget">
 				<div class="widget-header">
 					<h2>Today's Schedule</h2>
-					<a href="/calendar" class="view-all">View Calendar</a>
+					<div class="flex items-center gap-3">
+						<a href="/calendar?view=agenda" class="text-accent hover:underline text-sm font-medium">Agenda</a>
+						<a href="/calendar" class="view-all">Full Calendar</a>
+					</div>
 				</div>
 				<Card padding="none" class="widget-card">
 					{#if data.todayEvents.length === 0}
@@ -109,28 +155,17 @@
 					{:else}
 						<div class="event-list">
 							{#each data.todayEvents as event}
-								<div class="event-item">
-									<div class="event-time">
-										<span>{formatTime(event.startTime)}</span>
-										<span class="time-end">{formatTime(event.endTime)}</span>
+								<div class="event-row">
+									<div class="event-time-col">
+										<span class="event-time-start">{formatTime(event.startTime)}</span>
+										<span class="event-time-end">{formatTime(event.endTime)}</span>
 									</div>
-									<div class="event-divider">
-										<div class="event-dot" style="background-color: {event.color}"></div>
-										<div class="event-line"></div>
-									</div>
-									<div class="event-details">
-										<div class="event-card" style="border-left-color: {event.color}; background-color: color-mix(in srgb, {event.color} 10%, transparent)">
-											<p class="event-title">{event.title}</p>
-											{#if event.location}
-												<p class="event-meta">
-													<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-														<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-														<circle cx="12" cy="10" r="3" />
-													</svg>
-													{event.location}
-												</p>
-											{/if}
-										</div>
+									<div class="event-accent-bar" style="background: {event.color}"></div>
+									<div class="event-info">
+										<span class="event-name">{event.title}</span>
+										{#if event.location}
+											<span class="event-location">{event.location}</span>
+										{/if}
 									</div>
 								</div>
 							{/each}
@@ -139,29 +174,26 @@
 				</Card>
 			</section>
 
-			<!-- Recent AI Conversation -->
+			<!-- AI Card -->
 			<section class="widget mt-6">
-				<div class="widget-header">
-					<h2>AI Assistant</h2>
-					<a href="/ai" class="view-all">New Chat</a>
-				</div>
-				<Card padding="md" class="widget-card bg-surface hover:border-accent transition-colors cursor-pointer" onclick={() => location.href='/ai'}>
-					<div class="ai-preview">
-						<div class="ai-icon">
-							<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M12 2a8 8 0 0 0-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 0 0-8-8z" />
-								<circle cx="12" cy="10" r="3" />
+				<a href="/ai" class="ai-gradient-card" aria-label="Chat with AI">
+					<div class="ai-card-glow"></div>
+					<div class="ai-card-inner">
+						<div class="ai-card-icon">
+							<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+								<path d="M12 3l-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
 							</svg>
 						</div>
-						<div class="ai-info">
-							<p class="ai-title">{data.recentAiConversation ? data.recentAiConversation.title : 'Start a new conversation'}</p>
-							<p class="ai-desc">Ask FlowPlan AI to help schedule your week or break down tasks.</p>
+						<div class="ai-card-text">
+							<p class="ai-card-title">FlowPlan AI</p>
+							<p class="ai-card-sub">Ask anything — tasks, schedule, advice</p>
 						</div>
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-tertiary">
-							<path d="M9 18l6-6-6-6" />
-						</svg>
+						<div class="ai-card-cta">
+							Chat
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+						</div>
 					</div>
-				</Card>
+				</a>
 			</section>
 		</div>
 
@@ -171,7 +203,13 @@
 			<section class="widget">
 				<div class="widget-header">
 					<h2>Due Today</h2>
-					<a href="/tasks" class="view-all">View All</a>
+					<div class="flex items-center gap-3">
+						<a href="/tasks?new=true" class="text-accent hover:underline text-sm font-medium flex items-center gap-1">
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+							New Task
+						</a>
+						<a href="/tasks" class="view-all">View All</a>
+					</div>
 				</div>
 				<Card padding="none" class="widget-card">
 					{#if data.todayTasks.length === 0}
@@ -184,14 +222,18 @@
 						</div>
 					{:else}
 						<ul class="task-list">
-							{#each data.todayTasks as task}
-								<li class="task-item">
-									<label class="task-checkbox-container">
-										<input type="checkbox" class="task-checkbox" />
-										<span class="checkmark"></span>
-									</label>
+							{#each data.todayTasks as task (task.id)}
+								<li class="task-item" class:completing={completingIds.has(task.id)}>
+									<button
+										class="circle-check"
+										class:checked={completingIds.has(task.id)}
+										onclick={() => handleCheck(task.id)}
+										aria-label="Complete task"
+									>
+										<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+									</button>
 									<div class="task-content">
-										<p class="task-title">{task.title}</p>
+										<p class="task-title" class:strike={completingIds.has(task.id)}>{task.title}</p>
 										<div class="task-meta">
 											{#if task.priority && task.priority !== 'MEDIUM'}
 												<span class="task-priority" style="color: {PRIORITY_COLORS[task.priority]}">
@@ -203,6 +245,9 @@
 											{/if}
 										</div>
 									</div>
+									{#if completingIds.has(task.id)}
+										<button class="undo-btn" onclick={() => handleCheck(task.id)}>Undo</button>
+									{/if}
 								</li>
 							{/each}
 						</ul>
@@ -222,18 +267,25 @@
 						</div>
 					{:else}
 						<ul class="task-list">
-							{#each data.upcomingTasks as task}
-								<li class="task-item">
-									<label class="task-checkbox-container">
-										<input type="checkbox" class="task-checkbox" />
-										<span class="checkmark"></span>
-									</label>
+							{#each data.upcomingTasks as task (task.id)}
+								<li class="task-item" class:completing={completingIds.has(task.id)}>
+									<button
+										class="circle-check"
+										class:checked={completingIds.has(task.id)}
+										onclick={() => handleCheck(task.id)}
+										aria-label="Complete task"
+									>
+										<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+									</button>
 									<div class="task-content">
-										<p class="task-title">{task.title}</p>
+										<p class="task-title" class:strike={completingIds.has(task.id)}>{task.title}</p>
 										<div class="task-meta">
 											<span class="task-date">{formatDate(task.dueDate)}</span>
 										</div>
 									</div>
+									{#if completingIds.has(task.id)}
+										<button class="undo-btn" onclick={() => handleCheck(task.id)}>Undo</button>
+									{/if}
 								</li>
 							{/each}
 						</ul>
@@ -261,6 +313,17 @@
 		flex-wrap: wrap;
 		gap: 1rem;
 	}
+	.header-left {
+		display: flex;
+		align-items: center;
+		gap: 2rem;
+		flex-wrap: wrap;
+		flex: 1;
+	}
+	.greeting-container {
+		display: flex;
+		flex-direction: column;
+	}
 	.greeting {
 		font-size: 1.8rem;
 		font-weight: 700;
@@ -269,10 +332,54 @@
 		letter-spacing: -0.02em;
 	}
 	.date-subtitle {
-		font-size: 0.95rem;
 		color: var(--color-text-secondary);
+		font-size: 0.95rem;
 		margin: 0;
 	}
+	.ai-summary {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin: 0;
+		padding: 0.75rem 1rem;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-left: 3px solid var(--color-accent);
+		border-radius: var(--radius-md);
+		font-size: 0.9rem;
+		color: var(--color-text);
+		flex: 1;
+	}
+	.ai-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.2rem 0.5rem;
+		border-radius: var(--radius-sm);
+		background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		color: var(--color-accent);
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		flex-shrink: 0;
+		white-space: nowrap;
+		border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+	}
+	.summary-content p, .typewriter-text { margin: 0; font-weight: 500; line-height: 1.5; flex: 1; }
+	.cursor {
+		display: inline-block;
+		width: 2px;
+		height: 0.9em;
+		background: var(--color-accent);
+		border-radius: 1px;
+		margin-left: 1px;
+		vertical-align: middle;
+		animation: blink 0.7s steps(1) infinite;
+	}
+	.cursor.hidden { display: none; }
+	@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+	
 	.header-actions {
 		display: flex;
 		gap: 0.75rem;
@@ -281,14 +388,14 @@
 	/* Stats Grid */
 	.stats-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 1rem;
 	}
 	.stat-card {
 		display: flex;
 		align-items: center;
-		gap: 1rem;
-		padding: 1.25rem;
+		gap: 1.25rem;
+		padding: 1.5rem 1.75rem;
 	}
 	.stat-icon {
 		width: 48px;
@@ -297,17 +404,26 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		flex-shrink: 0;
+	}
+	.stat-content {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 	}
 	.stat-label {
-		font-size: 0.85rem;
+		font-size: 0.8rem;
 		color: var(--color-text-secondary);
-		margin: 0 0 0.25rem;
+		margin: 0;
+		white-space: nowrap;
 	}
 	.stat-value {
-		font-size: 1.5rem;
-		font-weight: 700;
+		font-size: 2rem;
+		font-weight: 800;
 		color: var(--color-text);
 		margin: 0;
+		letter-spacing: -0.03em;
+		line-height: 1;
 	}
 
 	/* Main Grid */
@@ -366,77 +482,64 @@
 
 	/* Schedule Widget */
 	.event-list {
-		padding: 1.25rem 1rem;
 		display: flex;
 		flex-direction: column;
+		gap: 0;
 	}
-	.event-item {
+	.event-row {
 		display: flex;
-		min-height: 60px;
-	}
-	.event-time {
-		width: 70px;
-		flex-shrink: 0;
-		display: flex;
-		flex-direction: column;
-		font-size: 0.8rem;
-		color: var(--color-text-secondary);
-		padding-top: 0.25rem;
-		text-align: right;
-		padding-right: 0.75rem;
-	}
-	.time-end {
-		color: var(--color-text-tertiary);
-		font-size: 0.75rem;
-	}
-	.event-divider {
-		display: flex;
-		flex-direction: column;
 		align-items: center;
-		width: 20px;
-		flex-shrink: 0;
-	}
-	.event-dot {
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		border: 2px solid var(--color-surface);
-		z-index: 2;
-		margin-top: 0.35rem;
-	}
-	.event-line {
-		width: 2px;
-		flex: 1;
-		background: var(--color-border);
-		margin-top: -8px;
-		margin-bottom: -10px;
-	}
-	.event-item:last-child .event-line {
-		display: none;
-	}
-	.event-details {
-		flex: 1;
-		padding-left: 1rem;
-		padding-bottom: 1.5rem;
-	}
-	.event-card {
+		gap: 0.875rem;
 		padding: 0.75rem 1rem;
-		border-radius: var(--radius-md);
-		border-left: 4px solid;
+		border-bottom: 1px solid var(--color-border-light);
+		transition: background var(--transition-fast);
 	}
-	.event-title {
-		font-size: 0.95rem;
+	.event-row:last-child { border-bottom: none; }
+	.event-row:hover { background: var(--color-surface-hover); }
+	.event-time-col {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		width: 56px;
+		flex-shrink: 0;
+		gap: 2px;
+	}
+	.event-time-start {
+		font-size: 0.8rem;
 		font-weight: 600;
 		color: var(--color-text);
-		margin: 0 0 0.25rem;
 	}
-	.event-meta {
-		font-size: 0.8rem;
-		color: var(--color-text-secondary);
+	.event-time-end {
+		font-size: 0.72rem;
+		color: var(--color-text-tertiary);
+	}
+	.event-accent-bar {
+		width: 3px;
+		height: 32px;
+		border-radius: 99px;
+		flex-shrink: 0;
+	}
+	.event-info {
 		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		margin: 0;
+		flex-direction: column;
+		gap: 2px;
+		flex: 1;
+		min-width: 0;
+	}
+	.event-name {
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: var(--color-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.event-location {
+		font-size: 0.75rem;
+		color: var(--color-text-tertiary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	/* Tasks Widget */
@@ -458,54 +561,6 @@
 	}
 	.task-item:hover {
 		background: var(--color-surface-hover);
-	}
-	.task-checkbox-container {
-		display: block;
-		position: relative;
-		cursor: pointer;
-		width: 20px;
-		height: 20px;
-		margin-top: 0.1rem;
-	}
-	.task-checkbox {
-		position: absolute;
-		opacity: 0;
-		cursor: pointer;
-		height: 0;
-		width: 0;
-	}
-	.checkmark {
-		position: absolute;
-		top: 0;
-		left: 0;
-		height: 20px;
-		width: 20px;
-		background-color: var(--color-bg);
-		border: 2px solid var(--color-border);
-		border-radius: 4px;
-		transition: all 0.2s;
-	}
-	.task-checkbox-container:hover input ~ .checkmark {
-		border-color: var(--color-accent);
-	}
-	.task-checkbox:checked ~ .checkmark {
-		background-color: var(--color-success);
-		border-color: var(--color-success);
-	}
-	.checkmark:after {
-		content: "";
-		position: absolute;
-		display: none;
-		left: 5px;
-		top: 1px;
-		width: 6px;
-		height: 12px;
-		border: solid white;
-		border-width: 0 2px 2px 0;
-		transform: rotate(45deg);
-	}
-	.task-checkbox:checked ~ .checkmark:after {
-		display: block;
 	}
 	.task-content {
 		flex: 1;
@@ -529,36 +584,120 @@
 		color: var(--color-text-secondary);
 	}
 
-	/* AI Preview */
-	.ai-preview {
+	/* Circle checkboxes (match tasks page) */
+	.circle-check {
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		border: 2px solid var(--color-text-tertiary);
+		background: var(--color-bg);
+		cursor: pointer;
 		display: flex;
 		align-items: center;
-		gap: 1.25rem;
+		justify-content: center;
+		color: transparent;
+		transition: all 0.15s;
+		flex-shrink: 0;
+		margin-top: 0.1rem;
 	}
-	.ai-icon {
-		width: 48px;
-		height: 48px;
-		border-radius: var(--radius-full);
-		background: linear-gradient(135deg, var(--color-accent), #a855f7);
+	.circle-check:hover {
+		border-color: var(--color-accent);
+		color: var(--color-accent);
+	}
+	.circle-check.checked {
+		background: var(--color-success);
+		border-color: var(--color-success);
 		color: white;
+	}
+	.task-item.completing { opacity: 0.7; }
+	.task-title.strike {
+		text-decoration: line-through;
+		color: var(--color-text-tertiary);
+	}
+	.undo-btn {
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		border: none;
+		padding: 0.2rem 0.5rem;
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		white-space: nowrap;
+		transition: all 0.15s;
+	}
+	.undo-btn:hover { background: var(--color-accent); color: white; }
+
+	/* AI gradient card */
+	.ai-gradient-card {
+		display: block;
+		position: relative;
+		border-radius: var(--radius-lg);
+		text-decoration: none;
+		overflow: hidden;
+		cursor: pointer;
+		transition: transform 0.2s, box-shadow 0.2s;
+		border: 1px solid var(--color-border);
+	}
+	.ai-gradient-card:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 4px 16px color-mix(in srgb, var(--color-accent) 20%, transparent);
+		border-color: var(--color-accent);
+	}
+	.ai-card-glow {
+		position: absolute;
+		inset: 0;
+		background: var(--color-surface);
+		z-index: 0;
+	}
+	.ai-card-inner {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		padding: 1rem 1.25rem;
+	}
+	.ai-card-icon {
+		width: 40px;
+		height: 40px;
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+		color: var(--color-accent);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
 	}
-	.ai-info {
-		flex: 1;
-	}
-	.ai-title {
-		font-size: 1rem;
+	.ai-card-text { flex: 1; }
+	.ai-card-title {
+		font-size: 0.95rem;
 		font-weight: 600;
 		color: var(--color-text);
-		margin: 0 0 0.25rem;
+		margin: 0 0 0.15rem;
 	}
-	.ai-desc {
-		font-size: 0.85rem;
+	.ai-card-sub {
+		font-size: 0.8rem;
 		color: var(--color-text-secondary);
 		margin: 0;
+	}
+	.ai-card-cta {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+		border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+		color: var(--color-accent);
+		font-size: 0.8rem;
+		font-weight: 600;
+		padding: 0.35rem 0.75rem;
+		border-radius: 9999px;
+		transition: background 0.15s;
+		white-space: nowrap;
+	}
+	.ai-gradient-card:hover .ai-card-cta {
+		background: color-mix(in srgb, var(--color-accent) 20%, transparent);
 	}
 
 	@media (max-width: 1024px) {

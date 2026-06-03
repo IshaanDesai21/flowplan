@@ -5,13 +5,19 @@
 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
 	import TopBar from '$lib/components/layout/TopBar.svelte';
 	import MobileNav from '$lib/components/layout/MobileNav.svelte';
+	import CommandPalette from '$lib/components/layout/CommandPalette.svelte';
 
 	let { children, data } = $props();
 
 	let isMobile = $state(false);
+	let isCommandPaletteOpen = $state(false);
 
 	onMount(() => {
 		sidebar.initialize();
+		
+		// Warmup AI models in the background to prevent cold starts
+		fetch('/api/ai/warmup').catch(() => {});
+
 		const mq = window.matchMedia('(max-width: 768px)');
 		isMobile = mq.matches;
 		const handler = (e: MediaQueryListEvent) => (isMobile = e.matches);
@@ -26,7 +32,7 @@
 	{/if}
 
 	<div class="app-main" class:sidebar-collapsed={$sidebar.isCollapsed} class:mobile={isMobile}>
-		<TopBar user={data.user} {isMobile} />
+		<TopBar user={data.user} {isMobile} onSearch={() => isCommandPaletteOpen = true} />
 		<main class="app-content">
 			{@render children()}
 		</main>
@@ -36,6 +42,9 @@
 		<MobileNav currentPath={$page.url.pathname} />
 	{/if}
 </div>
+
+<CommandPalette bind:isOpen={isCommandPaletteOpen} />
+
 
 <style>
 	.app-shell {

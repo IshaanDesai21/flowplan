@@ -43,16 +43,16 @@
 </svelte:head>
 
 <div class="auth-page">
-	<div class="auth-bg">
-		<div class="gradient-orb orb-1"></div>
-		<div class="gradient-orb orb-2"></div>
-	</div>
+	<a href="/" class="back-link">
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+		Back to home
+	</a>
 
 	<div class="auth-container animate-scale-in">
 		<a href="/" class="auth-brand">
 			<svg width="36" height="36" viewBox="0 0 32 32" fill="none">
 				<rect width="32" height="32" rx="8" fill="var(--color-accent)" />
-				<path d="M8 12h16M8 16h12M8 20h8M22 18l4 4-4 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+				<path d="M8 12h16M8 16h12M8 20h8" stroke="white" stroke-width="2.5" stroke-linecap="round" />
 			</svg>
 			<span>FlowPlan</span>
 		</a>
@@ -88,25 +88,27 @@
 	.auth-page {
 		min-height: 100vh;
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		padding: 2rem;
 		position: relative;
+		background: var(--color-bg);
 	}
-	.auth-bg {
-		position: fixed;
-		inset: 0;
-		z-index: -1;
-		overflow: hidden;
+	.back-link {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		margin-bottom: 1.5rem;
+		transition: color 0.15s;
+		align-self: flex-start;
+		margin-left: calc(50% - 210px);
 	}
-	.gradient-orb {
-		position: absolute;
-		border-radius: 50%;
-		filter: blur(120px);
-		opacity: 0.2;
-	}
-	.orb-1 { width: 500px; height: 500px; background: var(--color-accent); top: -150px; right: -100px; }
-	.orb-2 { width: 400px; height: 400px; background: #a855f7; bottom: -100px; left: -100px; }
+	.back-link:hover { color: var(--color-text); }
 	.auth-container {
 		width: 100%;
 		max-width: 420px;

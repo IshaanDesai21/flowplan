@@ -1,19 +1,22 @@
-import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db.js';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) {
-		throw redirect(302, '/login');
-	}
+	const userId = locals.user!.id;
 
-	const tasks = await db.task.findMany({
-		where: { userId: locals.user.id },
-		orderBy: [{ position: 'asc' }, { createdAt: 'desc' }]
-	});
+	const [tasks, checklists] = await Promise.all([
+		db.task.findMany({
+			where: { userId },
+			orderBy: [{ position: 'asc' }, { createdAt: 'desc' }]
+		}),
+		db.checklist.findMany({
+			where: { userId },
+			include: { items: { orderBy: { position: 'asc' } } },
+			orderBy: { createdAt: 'asc' }
+		})
+	]);
 
-	// Serialize dates for SvelteKit transfer
-	const serializedTasks = tasks.map(t => ({
+	const serializedTasks = tasks.map((t) => ({
 		...t,
 		dueDate: t.dueDate ? t.dueDate.toISOString() : null,
 		createdAt: t.createdAt.toISOString(),
@@ -21,5 +24,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 		completedAt: t.completedAt ? t.completedAt.toISOString() : null
 	}));
 
-	return { tasks: serializedTasks };
+	const serializedChecklists = checklists.map((c) => ({
+		...c,
+		dueDate: c.dueDate ? c.dueDate.toISOString() : null,
+		createdAt: c.createdAt.toISOString(),
+		updatedAt: c.updatedAt.toISOString(),
+		items: c.items.map((i) => ({
+			...i,
+			createdAt: i.createdAt.toISOString(),
+			updatedAt: i.updatedAt.toISOString()
+		}))
+	}));
+
+	return { tasks: serializedTasks, checklists: serializedChecklists };
 };
