@@ -11,6 +11,8 @@
   "observability": {
     "enabled": true
   },
+  "workers_dev": true,
+  "preview_urls": true,
   "main": ".svelte-kit/cloudflare/_worker.js",
   "assets": {
     "binding": "ASSETS",
