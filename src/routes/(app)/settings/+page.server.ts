@@ -4,9 +4,14 @@ import { db } from '$lib/server/db.js';
 export const load: PageServerLoad = async ({ locals }) => {
 	const user = locals.user!;
 
-	const settings = await db.userSettings.findUnique({
-		where: { userId: user.id }
-	});
+	let settings = null;
+	try {
+		settings = await db.userSettings.findUnique({
+			where: { userId: user.id }
+		});
+	} catch (e) {
+		console.error('Settings: failed to load settings:', e);
+	}
 
 	return {
 		settings: settings ? {

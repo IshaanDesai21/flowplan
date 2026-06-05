@@ -1,0 +1,17 @@
+{
+  "name": "FlowPlan",
+  "short_name": "FlowPlan",
+  "description": "Your intelligent productivity platform. Calendar, tasks, AI assistant, and more.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0f0f12",
+  "theme_color": "#0f0f12",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

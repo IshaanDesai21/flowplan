@@ -4,17 +4,24 @@ import { db } from '$lib/server/db.js';
 export const load: PageServerLoad = async ({ locals }) => {
 	const userId = locals.user!.id;
 
-	const [tasks, checklists] = await Promise.all([
-		db.task.findMany({
-			where: { userId },
-			orderBy: [{ position: 'asc' }, { createdAt: 'desc' }]
-		}),
-		db.checklist.findMany({
-			where: { userId },
-			include: { items: { orderBy: { position: 'asc' } } },
-			orderBy: { createdAt: 'asc' }
-		})
-	]);
+	let tasks: any[] = [];
+	let checklists: any[] = [];
+
+	try {
+		[tasks, checklists] = await Promise.all([
+			db.task.findMany({
+				where: { userId },
+				orderBy: [{ position: 'asc' }, { createdAt: 'desc' }]
+			}),
+			db.checklist.findMany({
+				where: { userId },
+				include: { items: { orderBy: { position: 'asc' } } },
+				orderBy: { createdAt: 'asc' }
+			})
+		]);
+	} catch (e) {
+		console.error('Tasks: failed to load data:', e);
+	}
 
 	const serializedTasks = tasks.map((t) => ({
 		...t,
@@ -29,7 +36,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		dueDate: c.dueDate ? c.dueDate.toISOString() : null,
 		createdAt: c.createdAt.toISOString(),
 		updatedAt: c.updatedAt.toISOString(),
-		items: c.items.map((i) => ({
+		items: c.items.map((i: any) => ({
 			...i,
 			createdAt: i.createdAt.toISOString(),
 			updatedAt: i.updatedAt.toISOString()

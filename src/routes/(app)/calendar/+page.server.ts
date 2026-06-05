@@ -13,21 +13,26 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const start = subDays(startOfMonth(baseDate), 7);
 	const end = addDays(endOfMonth(baseDate), 7);
 
-	const events = await db.calendarEvent.findMany({
-		where: {
-			userId: locals.user.id,
-			startTime: { gte: start },
-			endTime: { lte: end }
-		},
-		orderBy: { startTime: 'asc' }
-	});
+	let serializedEvents: any[] = [];
+	try {
+		const events = await db.calendarEvent.findMany({
+			where: {
+				userId: locals.user.id,
+				startTime: { gte: start },
+				endTime: { lte: end }
+			},
+			orderBy: { startTime: 'asc' }
+		});
 
-	// Transform dates to strings for transfer
-	const serializedEvents = events.map(e => ({
-		...e,
-		startTime: e.startTime.toISOString(),
-		endTime: e.endTime.toISOString()
-	}));
+		// Transform dates to strings for transfer
+		serializedEvents = events.map(e => ({
+			...e,
+			startTime: e.startTime.toISOString(),
+			endTime: e.endTime.toISOString()
+		}));
+	} catch (e) {
+		console.error('Calendar: failed to load events:', e);
+	}
 
 	return { events: serializedEvents, baseDate: baseDate.toISOString() };
 };

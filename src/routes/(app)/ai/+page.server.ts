@@ -27,26 +27,44 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	// Fetch or create the active conversation for authenticated users
-	let conversation = await db.aIConversation.findFirst({
-		where: { userId },
-		include: { messages: { orderBy: { createdAt: 'asc' } } },
-		orderBy: { updatedAt: 'desc' }
-	});
-
-	if (!conversation) {
-		conversation = await db.aIConversation.create({
-			data: {
-				userId,
-				title: 'Productivity Assistant',
-				messages: {
-					create: {
-						role: 'assistant',
-						content: "Hi! I'm your FlowPlan AI assistant. How can I help you organize your day?"
-					}
-				}
-			},
-			include: { messages: true }
+	let conversation: any = null;
+	try {
+		conversation = await db.aIConversation.findFirst({
+			where: { userId },
+			include: { messages: { orderBy: { createdAt: 'asc' } } },
+			orderBy: { updatedAt: 'desc' }
 		});
+
+		if (!conversation) {
+			conversation = await db.aIConversation.create({
+				data: {
+					userId,
+					title: 'Productivity Assistant',
+					messages: {
+						create: {
+							role: 'assistant',
+							content: "Hi! I'm your FlowPlan AI assistant. How can I help you organize your day?"
+						}
+					}
+				},
+				include: { messages: true }
+			});
+		}
+	} catch (e) {
+		console.error('AI: failed to load conversation:', e);
+		// Provide a fallback in-memory conversation
+		conversation = {
+			id: 'temp-conversation',
+			userId,
+			title: 'FlowPlan AI Assistant',
+			messages: [{
+				id: 'temp-msg-1',
+				conversationId: 'temp-conversation',
+				role: 'assistant',
+				content: "Hi! I'm your FlowPlan AI assistant. How can I help you organize your day?",
+				createdAt: new Date().toISOString()
+			}]
+		};
 	}
 
 	return {

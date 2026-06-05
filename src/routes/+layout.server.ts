@@ -4,7 +4,11 @@ import { db } from '$lib/server/db.js';
 export const load: LayoutServerLoad = async ({ locals }) => {
 	let settings = null;
 	if (locals.user) {
-		settings = await db.userSettings.findUnique({ where: { userId: locals.user.id } });
+		try {
+			settings = await db.userSettings.findUnique({ where: { userId: locals.user.id } });
+		} catch (e) {
+			console.error('Layout: failed to load user settings, using defaults:', e);
+		}
 	}
 
 	return {
