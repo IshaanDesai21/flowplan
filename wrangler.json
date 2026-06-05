@@ -2,12 +2,6 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "flowplan",
   "compatibility_date": "2024-03-29",
-  "routes": [
-    {
-      "pattern": "flowplan.ftcblueprint.com",
-      "custom_domain": true
-    }
-  ],
   "observability": {
     "enabled": true
   },

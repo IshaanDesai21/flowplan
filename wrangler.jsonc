@@ -2,12 +2,6 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "calendar-webapp",
   "compatibility_date": "2026-06-03",
-  "routes": [
-    {
-      "pattern": "flowplan.ftcblueprint.com",
-      "custom_domain": true
-    }
-  ],
   "compatibility_flags": [
     "nodejs_compat"
   ],
