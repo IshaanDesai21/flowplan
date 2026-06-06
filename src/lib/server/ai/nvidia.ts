@@ -123,7 +123,7 @@ export async function generateAIResponse(message: string, context: AIContext): P
 			return fallbackResponse(message, context);
 		}
 
-		const data = await response.json();
+		const data = await response.json() as any;
 		return data.choices?.[0]?.message?.content || fallbackResponse(message, context);
 	} catch (err) {
 		console.error('NVIDIA API fetch error:', err);

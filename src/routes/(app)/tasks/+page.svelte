@@ -15,9 +15,14 @@
 	// svelte-ignore state_referenced_locally
 	let tasks = $state(data.tasks);
 
-	// ── Lists (Google Tasks style) ────────────────────────────────
-	// svelte-ignore state_referenced_locally
-	let lists = $state(data.checklists as any[]);
+	// Instead of data.checklists, we use user taskLists
+	let taskLists = $state<string[]>($page.data.settings?.productivityPrefs?.taskLists || ['To-Do']);
+	
+	let lists = $derived(taskLists.map(listName => ({
+		id: listName,
+		title: listName,
+		items: tasks.filter((t: any) => (t.category || taskLists[0]) === listName)
+	})));
 
 	let viewMode = $state<'compact' | 'expanded'>(
 		(typeof localStorage !== 'undefined' && (localStorage.getItem('taskViewMode') as any)) || 'expanded'
@@ -30,18 +35,8 @@
 	let vmOpen = $state(false);
 
 	const vmOptions = [
-		{
-			value: 'expanded' as const,
-			label: 'Expanded',
-			desc: 'Full detail cards',
-			icon: `<rect x="3" y="3" width="18" height="5" rx="1"/><rect x="3" y="10" width="18" height="5" rx="1"/><rect x="3" y="17" width="18" height="5" rx="1"/>`
-		},
-		{
-			value: 'compact' as const,
-			label: 'Compact',
-			desc: 'Minimal list rows',
-			icon: `<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>`
-		}
+		{ value: 'expanded' as const, label: 'Expanded', desc: 'Full detail cards', icon: `<rect x="3" y="3" width="18" height="5" rx="1"/><rect x="3" y="10" width="18" height="5" rx="1"/><rect x="3" y="17" width="18" height="5" rx="1"/>` },
+		{ value: 'compact' as const, label: 'Compact', desc: 'Minimal list rows', icon: `<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>` }
 	];
 	const vmCurrent = $derived(vmOptions.find(o => o.value === viewMode)!);
 	let hiddenListIds = $state<Set<string>>(new Set());
@@ -78,41 +73,45 @@
 		setTimeout(() => listTitleInput?.focus(), 50);
 	}
 
+	async function saveSettingsLists(newLists: string[]) {
+		taskLists = newLists;
+		const prefs = $page.data.settings?.productivityPrefs || {};
+		await fetch('/api/settings', {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ productivityPrefs: { ...prefs, taskLists: newLists } })
+		}).catch(console.error);
+	}
+
 	async function createList() {
 		const title = newListTitle.trim();
 		if (!title) { isCreatingList = false; return; }
 		isCreatingList = false;
 		newListTitle = '';
 
-		const id = crypto.randomUUID();
-		const optimistic = { id, title, items: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-		lists = [...lists, optimistic];
-
-		const res = await fetch('/api/checklists', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ title })
-		});
-		if (res.ok) {
-			const real = await res.json();
-			lists = lists.map((l) => (l.id === id ? { ...l, id: real.id } : l));
+		if (!taskLists.includes(title)) {
+			await saveSettingsLists([...taskLists, title]);
 		}
 	}
 
 	async function deleteList(listId: string) {
-		if (!confirm('Delete this list and all its items?')) return;
-		lists = lists.filter((l) => l.id !== listId);
-		await fetch(`/api/checklists/${listId}`, { method: 'DELETE' }).catch(console.error);
+		if (!confirm('Delete this list? Its tasks will remain in your dashboard but lose this category.')) return;
+		const newLists = taskLists.filter(l => l !== listId);
+		await saveSettingsLists(newLists.length > 0 ? newLists : ['To-Do']);
 	}
 
 	async function renameList(listId: string, newTitle: string) {
-		if (!newTitle.trim()) return;
-		lists = lists.map((l) => (l.id === listId ? { ...l, title: newTitle } : l));
-		await fetch(`/api/checklists/${listId}`, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ title: newTitle })
-		}).catch(console.error);
+		const title = newTitle.trim();
+		if (!title || listId === title || taskLists.includes(title)) return;
+		
+		const newLists = taskLists.map(l => l === listId ? title : l);
+		await saveSettingsLists(newLists);
+
+		tasks = tasks.map(t => (t.category === listId ? { ...t, category: title } : t));
+		
+		lists.find(l => l.id === title)?.items.forEach(item => {
+			fetch(`/api/tasks/${item.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ category: title }) })
+		});
 	}
 
 	function toggleListVisibility(listId: string) {
@@ -137,39 +136,33 @@
 
 		const id = crypto.randomUUID();
 		const position = (lists.find((l) => l.id === listId)?.items.length ?? 0);
-		const optimistic = { id, checklistId: listId, title, isCompleted: false, position, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-		lists = lists.map((l) => l.id === listId ? { ...l, items: [...l.items, optimistic] } : l);
+		const optimistic = { id, title, category: listId, status: 'NOT_STARTED', position, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+		tasks = [...tasks, optimistic];
 
-		const res = await fetch(`/api/checklists/${listId}/items`, {
+		const res = await fetch('/api/tasks', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ title, position })
+			body: JSON.stringify({ title, position, category: listId, status: 'NOT_STARTED', priority: 'MEDIUM' })
 		});
 		if (res.ok) {
 			const real = await res.json();
-			lists = lists.map((l) => l.id === listId
-				? { ...l, items: l.items.map((i: any) => (i.id === id ? { ...i, id: real.id } : i)) }
-				: l
-			);
+			tasks = tasks.map((t: any) => (t.id === id ? real : t));
 		}
 	}
 
 	function handleTaskCheck(listId: string, item: any) {
-		if (item.isCompleted) {
-			// Uncheck immediately
-			performToggle(listId, item.id, false);
+		if (item.status === 'COMPLETED') {
+			performToggle(item.id, 'NOT_STARTED');
 		} else {
 			if (completingItemIds.has(item.id)) {
-				// Undo check
 				clearTimeout(completingItemIds.get(item.id));
 				completingItemIds.delete(item.id);
-				completingItemIds = new Map(completingItemIds); // trigger reactivity
+				completingItemIds = new Map(completingItemIds);
 			} else {
-				// Start check delay
 				const timeoutId = setTimeout(() => {
 					completingItemIds.delete(item.id);
 					completingItemIds = new Map(completingItemIds);
-					performToggle(listId, item.id, true);
+					performToggle(item.id, 'COMPLETED');
 				}, 1500);
 				completingItemIds.set(item.id, timeoutId);
 				completingItemIds = new Map(completingItemIds);
@@ -177,27 +170,18 @@
 		}
 	}
 
-	async function performToggle(listId: string, itemId: string, isCompleted: boolean) {
-		lists = lists.map((l) => {
-			if (l.id !== listId) return l;
-			return {
-				...l,
-				items: l.items.map((i: any) => (i.id === itemId ? { ...i, isCompleted } : i))
-			};
-		});
-
-		await fetch(`/api/checklists/items/${itemId}`, {
+	async function performToggle(itemId: string, status: string) {
+		tasks = tasks.map((t) => (t.id === itemId ? { ...t, status } : t));
+		await fetch(`/api/tasks/${itemId}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ isCompleted })
+			body: JSON.stringify({ status })
 		}).catch(console.error);
 	}
 
 	async function deleteItem(listId: string, itemId: string) {
-		lists = lists.map((l) =>
-			l.id === listId ? { ...l, items: l.items.filter((i: any) => i.id !== itemId) } : l
-		);
-		await fetch(`/api/checklists/items/${itemId}`, { method: 'DELETE' }).catch(console.error);
+		tasks = tasks.filter((t) => t.id !== itemId);
+		await fetch(`/api/tasks/${itemId}`, { method: 'DELETE' }).catch(console.error);
 	}
 
 	function startEditingItem(item: any) {
@@ -209,12 +193,8 @@
 		const title = editingItemTitle.trim();
 		editingItemId = null;
 		if (!title) return;
-		lists = lists.map((l) =>
-			l.id === listId
-				? { ...l, items: l.items.map((i: any) => (i.id === itemId ? { ...i, title } : i)) }
-				: l
-		);
-		await fetch(`/api/checklists/items/${itemId}`, {
+		tasks = tasks.map((t) => (t.id === itemId ? { ...t, title } : t));
+		await fetch(`/api/tasks/${itemId}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ title })
@@ -229,38 +209,40 @@
 
 	// ── Kanban ───────────────────────────────────────────────────
 	async function handleSaveTask(taskData: any) {
+		const isEdit = !!taskData.id;
+
+		// Optimistically close the form and add the task immediately
+		const tempId = taskData.id || crypto.randomUUID();
+		const optimistic = { ...taskData, id: tempId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+		if (!isEdit) {
+			tasks = [...tasks, optimistic];
+		}
+		isTaskFormOpen = false;
+		// Clean up URL if opened from ?new=true
+		if ($page.url.searchParams.has('new')) {
+			const url = new URL($page.url);
+			url.searchParams.delete('new');
+			goto(url.pathname + url.search, { replaceState: true, keepFocus: true });
+		}
+
 		try {
-			const isEdit = !!taskData.id;
 			const res = await fetch(isEdit ? `/api/tasks/${taskData.id}` : '/api/tasks', {
 				method: isEdit ? 'PUT' : 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(taskData)
 			});
 			if (!res.ok) throw new Error();
-			const saved = await res.json();
-			tasks = isEdit ? tasks.map((t: any) => (t.id === saved.id ? saved : t)) : [...tasks, saved];
+			const saved = await res.json() as any;
+			// Replace the optimistic entry with the real server response
+			tasks = isEdit
+				? tasks.map((t: any) => (t.id === saved.id ? saved : t))
+				: tasks.map((t: any) => (t.id === tempId ? saved : t));
 			toasts.success(isEdit ? 'Task updated' : 'Task created');
-			isTaskFormOpen = false;
-			// Clean up URL if needed
-			if ($page.url.searchParams.has('new')) {
-				const url = new URL($page.url);
-				url.searchParams.delete('new');
-				goto(url.pathname + url.search, { replaceState: true, keepFocus: true });
-			}
 		} catch {
-			toasts.error('Error saving task');
+			// Rollback optimistic update on failure
+			if (!isEdit) tasks = tasks.filter((t: any) => t.id !== tempId);
+			toasts.error('Failed to save task — please try again');
 		}
-	}
-
-	async function handleStatusChange(taskId: string, newStatus: string, newPosition: number) {
-		tasks = tasks.map((t: any) =>
-			t.id === taskId ? { ...t, status: newStatus, position: newPosition } : t
-		);
-		await fetch(`/api/tasks/${taskId}`, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ status: newStatus, position: newPosition })
-		}).catch(() => toasts.error('Failed to update task'));
 	}
 
 	let editingListName = $state<string | null>(null);
@@ -271,8 +253,6 @@
 	let draggedOverListId = $state<string | null>(null);
 
 	function handleListDragStart(e: DragEvent, listId: string) {
-		// Only drag if we're not interacting with the inner list (which can also scroll or have items)
-		// But for simplicity we'll just allow the column header to drag or the whole column
 		draggedListId = listId;
 		if (e.dataTransfer) {
 			e.dataTransfer.effectAllowed = 'move';
@@ -292,17 +272,91 @@
 		e.preventDefault();
 		draggedOverListId = null;
 		if (draggedListId && draggedListId !== listId) {
-			const sourceIndex = lists.findIndex((l) => l.id === draggedListId);
-			const targetIndex = lists.findIndex((l) => l.id === listId);
+			const sourceIndex = taskLists.findIndex((l) => l === draggedListId);
+			const targetIndex = taskLists.findIndex((l) => l === listId);
 			if (sourceIndex > -1 && targetIndex > -1) {
-				const newLists = [...lists];
+				const newLists = [...taskLists];
 				const [moved] = newLists.splice(sourceIndex, 1);
 				newLists.splice(targetIndex, 0, moved);
-				lists = newLists;
-				// If you have a PUT /api/checklists/order endpoint, call it here
+				saveSettingsLists(newLists);
 			}
 		}
 		draggedListId = null;
+	}
+
+	// ── Task Drag and Drop (between lists + within-list reorder) ──
+	let draggedTaskId = $state<string | null>(null);
+	let dragOverTaskId = $state<string | null>(null);
+	
+	function handleTaskDragStart(e: DragEvent, taskId: string) {
+		draggedTaskId = taskId;
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', taskId);
+		}
+		e.stopPropagation(); // prevent list column drag
+	}
+
+	function handleTaskDragOver(e: DragEvent, taskId: string) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (draggedTaskId && draggedTaskId !== taskId) {
+			dragOverTaskId = taskId;
+		}
+	}
+
+	function handleTaskDragLeave() {
+		dragOverTaskId = null;
+	}
+
+	function handleTaskDrop(e: DragEvent, listId: string, overTaskId?: string) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!draggedTaskId) return;
+
+		const sourceTask = tasks.find(t => t.id === draggedTaskId);
+		if (!sourceTask) { draggedTaskId = null; dragOverTaskId = null; return; }
+
+		// Get the ordered active tasks for this list
+		const listTasks = tasks
+			.filter((t: any) => (t.category || taskLists[0]) === listId && t.status !== 'COMPLETED')
+			.sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+
+		// Remove the dragged task from its current spot
+		const withoutDragged = tasks.filter(t => t.id !== draggedTaskId);
+
+		// Determine new position
+		let newPosition: number;
+		if (overTaskId && overTaskId !== draggedTaskId) {
+			// Insert before the task we dropped over
+			const overTask = listTasks.find((t: any) => t.id === overTaskId);
+			newPosition = overTask ? (overTask.position ?? 0) : 0;
+		} else {
+			// Drop onto empty list or list background — append at end
+			newPosition = listTasks.length > 0
+				? Math.max(...listTasks.map((t: any) => t.position ?? 0)) + 1
+				: 0;
+		}
+
+		// Bump positions of tasks at or after the new position in the same list
+		const updated = withoutDragged.map((t: any) => {
+			if ((t.category || taskLists[0]) === listId && t.status !== 'COMPLETED' && (t.position ?? 0) >= newPosition) {
+				return { ...t, position: (t.position ?? 0) + 1 };
+			}
+			return t;
+		});
+		updated.push({ ...sourceTask, category: listId, position: newPosition });
+		tasks = updated;
+
+		// Persist to DB: update the dragged task's category + position
+		fetch(`/api/tasks/${draggedTaskId}`, {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ category: listId, position: newPosition })
+		});
+
+		draggedTaskId = null;
+		dragOverTaskId = null;
 	}
 
 	$effect(() => {
@@ -311,6 +365,15 @@
 			isTaskFormOpen = true;
 		}
 	});
+
+	function stringToColor(str: string) {
+		let hash = 0;
+		for (let i = 0; i < str.length; i++) {
+			hash = str.charCodeAt(i) + ((hash << 5) - hash);
+		}
+		const h = hash % 360;
+		return `hsl(${h}, 70%, 50%)`;
+	}
 </script>
 
 <svelte:head>
@@ -394,7 +457,7 @@
 								<span class="list-dot" style="background: {stringToColor(list.title)}"></span>
 								<span class="list-tab-name">{list.title}</span>
 							</div>
-							<span class="list-count">{list.items.filter((i: any) => !i.isCompleted).length}</span>
+							<span class="list-count">{list.items.filter((i: any) => i.status !== 'COMPLETED').length}</span>
 						</button>
 					{/each}
 
@@ -435,8 +498,8 @@
 					</div>
 				{:else}
 					{#each unhiddenLists as list (list.id)}
-						{@const activeItems = list.items.filter((i: any) => !i.isCompleted)}
-						{@const completedItems = list.items.filter((i: any) => i.isCompleted)}
+						{@const activeItems = list.items.filter((i: any) => i.status !== 'COMPLETED')}
+						{@const completedItems = list.items.filter((i: any) => i.status === 'COMPLETED')}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div 
 							class="list-column {draggedOverListId === list.id ? 'dragged-over' : ''}"
@@ -444,7 +507,7 @@
 							ondragstart={(e) => handleListDragStart(e, list.id)}
 							ondragover={(e) => handleListDragOver(e, list.id)}
 							ondragleave={() => draggedOverListId = null}
-							ondrop={(e) => handleListDrop(e, list.id)}
+							ondrop={(e) => { handleListDrop(e, list.id); handleTaskDrop(e, list.id); }}
 							animate:flip={{ duration: 350, easing: quintOut }}
 							in:scale={{ duration: 300, start: 0.92, opacity: 0, easing: quintOut, delay: 50 }}
 							out:scale={{ duration: 200, start: 0.95, opacity: 0, easing: quintOut }}
@@ -484,11 +547,13 @@
 									<div
 										class="task-item"
 										class:compact-item={viewMode === 'compact'}
+										draggable="true"
+										ondragstart={(e) => handleTaskDragStart(e, item.id)}
 										onclick={(e) => {
 											// don't open edit if clicking checkbox, undo, delete
 											const t = e.target as HTMLElement;
 											if (t.closest('.item-check, .item-undo, .item-delete, .item-title-input')) return;
-											selectedTask = { id: item.id, title: item.title, status: 'NOT_STARTED', priority: item.priority ?? 'MEDIUM', notes: item.notes ?? '' };
+											selectedTask = item;
 											isTaskFormOpen = true;
 										}}
 										style="cursor: pointer"

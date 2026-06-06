@@ -23,14 +23,14 @@
 				dueDateStr = task.dueDate ? format(new Date(task.dueDate), 'yyyy-MM-dd') : '';
 				priority = task.priority;
 				status = task.status;
-				category = task.category || '';
+				category = task.category || taskLists[0];
 			} else {
 				title = '';
 				description = '';
 				dueDateStr = '';
 				priority = 'MEDIUM';
 				status = initialStatus;
-				category = '';
+				category = taskLists[0];
 			}
 		}
 	});
@@ -55,6 +55,8 @@
 		});
 	}
 
+	import { page } from '$app/stores';
+
 	const priorityOptions = [
 		{ value: 'LOW', label: PRIORITY_LABELS.LOW, color: PRIORITY_COLORS.LOW },
 		{ value: 'MEDIUM', label: PRIORITY_LABELS.MEDIUM, color: PRIORITY_COLORS.MEDIUM },
@@ -68,6 +70,9 @@
 		{ value: 'WAITING', label: TASK_STATUS_LABELS.WAITING, color: TASK_STATUS_COLORS.WAITING },
 		{ value: 'COMPLETED', label: TASK_STATUS_LABELS.COMPLETED, color: TASK_STATUS_COLORS.COMPLETED }
 	];
+
+	const taskLists = $derived($page.data.settings?.productivityPrefs?.taskLists || ['To-Do']);
+	const listOptions = $derived(taskLists.map((l: string) => ({ value: l, label: l })));
 </script>
 
 <Modal {isOpen} {onclose} title={task ? 'Edit Task' : 'New Task'}>
@@ -111,10 +116,9 @@
 				bind:value={status}
 			/>
 
-			<Input 
-				name="category" 
-				label="Category" 
-				placeholder="E.g., Work, Personal" 
+			<Dropdown 
+				label="List" 
+				options={listOptions} 
 				bind:value={category} 
 			/>
 		</div>

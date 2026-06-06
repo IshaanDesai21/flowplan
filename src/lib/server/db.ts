@@ -1,35 +1,43 @@
 import { PrismaClient } from '@prisma/client';
-import { PrismaLibSql } from '@prisma/adapter-libsql';
-import { createClient } from '@libsql/client/web';
 import { env } from '$env/dynamic/private';
 
-function createPrismaClient() {
-	// If Turso credentials are present, use the libsql adapter (production/Vercel/Cloudflare)
-	if (env.TURSO_DATABASE_URL && env.TURSO_AUTH_TOKEN) {
-		const libsql = createClient({
-			url: env.TURSO_DATABASE_URL,
-			authToken: env.TURSO_AUTH_TOKEN
-		});
-		const adapter = new PrismaLibSql(libsql as any);
-		return new PrismaClient({ adapter, log: ['error'] } as any);
+// Detect Cloudflare Workers / Edge environment (no Node.js process.versions)
+const isEdgeRuntime =
+	typeof process === 'undefined' ||
+	typeof (process as any).versions === 'undefined' ||
+	!(process as any).versions?.node;
+
+function createPrismaClient(): PrismaClient {
+	// Only use the libsql adapter in Cloudflare Workers (Edge runtime)
+	// In Node.js / dev mode, use the standard SQLite file driver — much simpler
+	if (isEdgeRuntime && env.TURSO_DATABASE_URL && env.TURSO_AUTH_TOKEN) {
+		// Dynamic imports so this branch is tree-shaken in non-Edge builds
+		// This is evaluated synchronously on first load in Edge only
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-var-requires
+			const { createClient } = require('@libsql/client/web');
+			// eslint-disable-next-line @typescript-eslint/no-var-requires
+			const { PrismaLibSql } = require('@prisma/adapter-libsql');
+			const libsql = createClient({
+				url: env.TURSO_DATABASE_URL,
+				authToken: env.TURSO_AUTH_TOKEN
+			});
+			const adapter = new PrismaLibSql(libsql);
+			return new PrismaClient({ adapter } as any);
+		} catch (e) {
+			console.error('[db] Edge adapter init failed:', e);
+		}
 	}
 
-	// Fallback: local SQLite file for development
+	// Standard Prisma for Node.js dev/build — reads DATABASE_URL from env
 	return new PrismaClient({ log: ['error'] });
 }
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+declare const globalThis: { _prisma?: PrismaClient } & typeof global;
 
-export const db = new Proxy({} as PrismaClient, {
-	get(target, prop) {
-		if (!globalForPrisma.prisma) {
-			globalForPrisma.prisma = createPrismaClient();
-		}
-		return (globalForPrisma.prisma as any)[prop];
-	}
-});
+export const db: PrismaClient = globalThis._prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== 'production') {
-	// in dev, the proxy itself doesn't need to be assigned to global,
-	// but the underlying client is cached in globalForPrisma.prisma
+// Cache in dev to survive HMR
+if (!isEdgeRuntime) {
+	globalThis._prisma = db;
 }
